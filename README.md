@@ -12,7 +12,13 @@
 ## Commands
 
 <!-- commands -->
-<!-- empty -->
+| Command                           | Title                         |
+| --------------------------------- | ----------------------------- |
+| `git-panel.history`               | Git Panel: History            |
+| `git-panel.history.filter`        | Git Panel: Git History Filter |
+| `git-panel.history.clear`         | Git Panel: Clear Selection    |
+| `git-panel.history.refresh`       | Git Panel: Refresh History    |
+| `git-panel.history.switch.branch` | Git Panel: Select Branch      |
 <!-- commands -->
 
 ## Sponsors
