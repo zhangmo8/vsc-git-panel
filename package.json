@@ -52,7 +52,7 @@
           "id": "git-panel.history",
           "name": "Git Panel",
           "type": "webview",
-          "icon": "$(list)",
+          "icon": "$(repo-forked)",
           "contextualTitle": "History"
         },
         {
@@ -134,6 +134,7 @@
     "release": "bumpp && nr publish"
   },
   "dependencies": {
+    "simple-git": "^3.27.0",
     "vue": "^3.5.13"
   },
   "devDependencies": {

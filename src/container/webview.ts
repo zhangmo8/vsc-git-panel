@@ -1,17 +1,28 @@
 import path from 'node:path'
 import type * as vscode from 'vscode'
 import { Uri } from 'vscode'
+import { GitService } from '../services/git'
+import { StorageService } from '../services/storage'
 
 export class GitPanelViewProvider implements vscode.WebviewViewProvider {
+  private gitService: GitService
+  private storageService: StorageService
   public static readonly viewType = 'git-panel.history'
+  private _view?: vscode.WebviewView
 
   constructor(
-    private readonly _extensionUri: vscode.Uri,
-  ) { }
+    private readonly _extensionUri: Uri,
+    context: vscode.ExtensionContext,
+  ) {
+    this.gitService = new GitService()
+    this.storageService = new StorageService(context)
+  }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
   ) {
+    this._view = webviewView
+
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
@@ -20,6 +31,43 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     }
 
     webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
+
+    // Handle messages from webview
+    webviewView.webview.onDidReceiveMessage(async (message) => {
+      switch (message.command) {
+        case 'getHistory':
+          try {
+            // Try to get commits from storage first
+            let commits = this.storageService.getCommits()
+            // If no stored commits or force refresh, get from git
+            if (commits.length === 0 || message.forceRefresh) {
+              const history = await this.gitService.getHistory()
+
+              console.log('history', history)
+
+              commits = history.all
+              // Store the new commits
+              this.storageService.saveCommits(commits)
+            }
+
+            webviewView.webview.postMessage({
+              command: 'history',
+              data: commits,
+            })
+          }
+          catch (error) {
+            webviewView.webview.postMessage({
+              command: 'Failed to get git history',
+              message: `${error}`,
+            })
+          }
+          break
+
+        case 'clearHistory':
+          this.storageService.clearCommits()
+          break
+      }
+    })
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {

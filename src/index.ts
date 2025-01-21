@@ -5,10 +5,12 @@ import { GitPanelViewProvider } from './container/webview'
 
 import { logger } from './utils'
 
-const { activate, deactivate } = defineExtension(async () => {
+export function activate(context: vscode.ExtensionContext) {
   logger.info('Git Panel Activated')
-  const provider = new GitPanelViewProvider(vscode.Uri.file(__dirname))
+  const provider = new GitPanelViewProvider(vscode.Uri.file(__dirname), context)
   vscode.window.registerWebviewViewProvider(GitPanelViewProvider.viewType, provider)
-})
+}
 
-export { activate, deactivate }
+export function deactivate() {
+  // Clean up resources
+}
