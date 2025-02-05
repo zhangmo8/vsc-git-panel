@@ -1,8 +1,8 @@
-import path from 'node:path'
 import type * as vscode from 'vscode'
 import { Uri } from 'vscode'
-import { GitService } from '../services/git'
-import { StorageService } from '../services/storage'
+import type { ListLogLine } from 'simple-git'
+import { GitService } from '@/git'
+import { StorageService } from '@/storage'
 
 export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private gitService: GitService
@@ -43,9 +43,15 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
             if (commits.length === 0 || message.forceRefresh) {
               const history = await this.gitService.getHistory()
 
-              console.log('history', history)
+              // 确保只传递可序列化的数据
+              commits = history.all.map(commit => ({
+                hash: commit.hash,
+                date: commit.date,
+                message: commit.message,
+                author_name: commit.author_name,
+                author_email: commit.author_email,
+              }) as ListLogLine)
 
-              commits = history.all
               // Store the new commits
               this.storageService.saveCommits(commits)
             }

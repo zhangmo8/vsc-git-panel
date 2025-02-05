@@ -1,3 +1,4 @@
+import type { ListLogLine } from 'simple-git'
 import type * as vscode from 'vscode'
 
 export class StorageService {
@@ -5,12 +6,12 @@ export class StorageService {
 
   constructor(private context: vscode.ExtensionContext) {}
 
-  saveCommits(commits: any[]) {
+  saveCommits(commits: ListLogLine[]) {
     this.context.globalState.update(StorageService.COMMITS_KEY, commits)
   }
 
-  getCommits(): any[] {
-    return this.context.globalState.get<any[]>(StorageService.COMMITS_KEY) || []
+  getCommits(): ListLogLine[] {
+    return this.context.globalState.get<ListLogLine[]>(StorageService.COMMITS_KEY) || []
   }
 
   clearCommits() {

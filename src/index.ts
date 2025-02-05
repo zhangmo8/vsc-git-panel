@@ -1,7 +1,7 @@
 import { defineExtension } from 'reactive-vscode'
 import * as vscode from 'vscode'
 
-import { GitPanelViewProvider } from './container/webview'
+import { GitPanelViewProvider } from './views/webview'
 
 import { logger } from './utils'
 

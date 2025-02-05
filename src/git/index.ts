@@ -19,10 +19,8 @@ export class GitService {
   }
 
   async getHistory(): Promise<LogResult> {
-    const COMMIT_FORMAT = '%H%n%D%n%aN%n%aE%n%at%n%ct%n%P%n%B'
-
     try {
-      return await this.git.log()
+      return await this.git.log([])
     }
     catch (error) {
       console.error('Error getting git history:', error)

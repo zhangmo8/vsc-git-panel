@@ -1,3 +1,4 @@
+import { resolve } from 'node:path'
 import { defineConfig } from 'tsup'
 
 export default defineConfig({
@@ -10,4 +11,9 @@ export default defineConfig({
   external: [
     'vscode',
   ],
+  esbuildOptions(options) {
+    options.alias = {
+      '@': resolve(__dirname, './src'),
+    }
+  },
 })
