@@ -1,7 +1,9 @@
 import type * as vscode from 'vscode'
 import { Uri, commands } from 'vscode'
+import type { ListLogLine } from 'simple-git'
 
 import { DiffViewService } from './diff/DiffViewService'
+import { GitChangesProvider } from './diff/GitChangesProvider'
 
 import type { GitService } from '@/git'
 import { StorageService } from '@/storage'
@@ -13,8 +15,10 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private gitService: GitService
   private storageService: StorageService
   private diffViewService: DiffViewService
+  private gitChangesProvider: GitChangesProvider
   public static readonly viewType = 'git-panel.history'
   private _view?: vscode.WebviewView
+  private _commits: ListLogLine[] = []
 
   constructor(
     private readonly _extensionUri: Uri,
@@ -24,6 +28,8 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     this.gitService = gitService
     this.storageService = new StorageService(context)
     this.diffViewService = DiffViewService.getInstance()
+    this.gitChangesProvider = GitChangesProvider.getInstance()
+    this._commits = this.storageService.getCommits()
   }
 
   public resolveWebviewView(
@@ -46,22 +52,21 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
       switch (message.command) {
         case WEBVIEW_CHANNEL.GET_HISTORY:
           try {
-            let commits = this.storageService.getCommits()
-            if (commits.length === 0 || message.forceRefresh) {
+            if (this._commits.length === 0 || message.forceRefresh) {
               const history = await this.gitService.getHistory()
 
-              commits = history.all.map(commit => ({
+              this._commits = history.all.map(commit => ({
                 ...commit,
                 authorName: commit.author_name,
                 authorEmail: commit.author_email,
               }) as Commit)
 
-              this.storageService.saveCommits(commits)
+              this.storageService.saveCommits(this._commits)
             }
 
             webviewView.webview.postMessage({
               command: CHANNEL.HISTORY,
-              data: commits,
+              commits: this._commits,
             })
           }
           catch (error) {
@@ -74,8 +79,9 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
 
         case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
           try {
-            this.diffViewService.showCommitFiles(message.commit.hash)
-            await commands.executeCommand('git.showCommitDetails', message.commit.hash)
+            this.diffViewService.showCommitFiles(message.commitHash)
+            this.gitChangesProvider.refresh(message.commitHash)
+            await commands.executeCommand('git.showCommitDetails', message.commitHash)
           }
           catch (error) {
             webviewView.webview.postMessage({

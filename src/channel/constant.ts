@@ -7,5 +7,4 @@ export const WEBVIEW_CHANNEL = {
 // vscode to webview channel
 export const CHANNEL = {
   HISTORY: 'history',
-  HISTORY_LOADED: 'history-loaded',
 }

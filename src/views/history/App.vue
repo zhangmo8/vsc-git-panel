@@ -33,7 +33,7 @@ window.addEventListener('message', (event: { data: any }) => {
   const message = event.data
   switch (message.command) {
     case CHANNEL.HISTORY:
-      commits.value = message.data as Commit[]
+      commits.value = message.commits as Commit[]
       break
     case 'error':
       error.value = message.message
@@ -63,7 +63,7 @@ watch([commits, selectedHash, filter], () => {
 
 onMounted(() => {
   // Request git history
-  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_HISTORY, forceRefresh: true })
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_HISTORY })
 })
 
 const transformedCommits = computed(() => {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import dayjs from 'dayjs'
 
 import type { Commit } from '@/git'
@@ -19,17 +19,17 @@ const props = defineProps<{
 //   isMerge?: boolean
 // }
 
+const ITEMS_PER_PAGE = 45
+const currentPage = ref(1)
+const observer = ref<IntersectionObserver | null>(null)
+const loadingTriggerRef = ref<HTMLElement | null>(null)
+
 function handleCommitClick(commit: Commit & { date: string }) {
   try {
     if (window.vscode) {
       window.vscode.postMessage({
         command: WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS,
-        commit: {
-          hash: commit.hash,
-          message: commit.message,
-          date: commit.date,
-          stats: commit.stats,
-        },
+        commitHash: commit.hash,
       })
     }
   }
@@ -56,6 +56,30 @@ const graphData = computed(() => {
     date: dayjs(commit.date).format('YYYY-MM-DD HH:mm'),
   }))
 })
+
+const visibleCommits = computed(() => {
+  const end = currentPage.value * ITEMS_PER_PAGE
+  return graphData.value.slice(0, end)
+})
+
+onMounted(() => {
+  observer.value = new IntersectionObserver((entries) => {
+    const target = entries[0]
+    if (target.isIntersecting && currentPage.value * ITEMS_PER_PAGE < graphData.value.length) {
+      currentPage.value++
+    }
+  })
+
+  if (loadingTriggerRef.value) {
+    observer.value.observe(loadingTriggerRef.value)
+  }
+})
+
+onUnmounted(() => {
+  if (observer.value) {
+    observer.value.disconnect()
+  }
+})
 </script>
 
 <template>
@@ -78,7 +102,7 @@ const graphData = computed(() => {
       </thead>
       <tbody>
         <tr
-          v-for="commit in graphData"
+          v-for="commit in visibleCommits"
           :key="commit.hash"
           class="commit-row"
           @click="handleCommitClick(commit)"
@@ -101,6 +125,13 @@ const graphData = computed(() => {
           </td>
           <td class="date">
             {{ commit.date }}
+          </td>
+        </tr>
+        <tr ref="loadingTriggerRef" class="loading-trigger">
+          <td colspan="5" class="loading-cell">
+            <div v-if="visibleCommits.length < graphData.length" class="loading-text">
+              Loading more commits...
+            </div>
           </td>
         </tr>
       </tbody>
@@ -194,6 +225,16 @@ td.hash-col:hover {
 
 tr:hover {
   background-color: var(--vscode-list-hoverBackground);
+}
+
+.loading-cell {
+  text-align: center;
+  padding: 8px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.loading-text {
+  font-size: 12px;
 }
 
 /* Ensure the graph lines remain visible when hovering */

@@ -9,13 +9,23 @@ export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
   readonly onDidChangeTreeData: vscode.Event<CommitNode | undefined | null | void> = this._onDidChangeTreeData.event
   private gitService: GitService
   private fileTreeProvider: FileTreeProvider
+  private selectedCommitHash?: string
+  private static instance: GitChangesProvider
 
-  constructor() {
+  private constructor() {
     this.gitService = new GitService()
     this.fileTreeProvider = new FileTreeProvider(this.gitService)
   }
 
-  refresh(): void {
+  static getInstance(): GitChangesProvider {
+    if (!GitChangesProvider.instance) {
+      GitChangesProvider.instance = new GitChangesProvider()
+    }
+    return GitChangesProvider.instance
+  }
+
+  refresh(commitHash?: string): void {
+    this.selectedCommitHash = commitHash
     this._onDidChangeTreeData.fire()
   }
 
@@ -23,31 +33,32 @@ export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
     return element
   }
 
-  private async getFirstCommitDetails(): Promise<CommitDetails | null> {
+  private async getCommitByHash(hash?: string): Promise<CommitDetails | null> {
     try {
       const history = await this.gitService.getHistory()
       if (history.all.length === 0) {
         return null
       }
 
-      const firstCommit = history.all[0]
+      const commit = history.all.find(c => c.hash === hash) || history.all[0]
       return {
-        hash: firstCommit.hash,
-        authorName: firstCommit.author_name,
-        authorEmail: firstCommit.author_email,
-        date: firstCommit.date,
-        stats: firstCommit.stats,
+        hash: commit.hash,
+        authorName: commit.author_name,
+        authorEmail: commit.author_email,
+        date: commit.date,
+        stats: commit.stats,
       }
     }
     catch (error) {
-      console.error('Error getting first commit details:', error)
+      console.error('Error getting commit details:', error)
       return null
     }
   }
 
   async getChildren(element?: CommitNode): Promise<CommitNode[]> {
     if (!element) {
-      const commitDetails = await this.getFirstCommitDetails()
+      const commitDetails = await this.getCommitByHash(this.selectedCommitHash)
+
       if (!commitDetails) {
         return []
       }
@@ -79,14 +90,14 @@ export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
         ),
         new CommitNode(
           'Changed Files',
-          'Changed Files',
+          `${changedFiles.length} Files Changed`,
           changedFiles.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None,
           'files',
-          changedFiles
+          changedFiles,
         ),
       ]
     }
-    else if (element.label === 'Changed Files' && element.children) {
+    else if (element.children) {
       return element.children as CommitNode[]
     }
 

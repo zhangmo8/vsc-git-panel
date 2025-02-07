@@ -16,7 +16,7 @@ export function activate(context: vscode.ExtensionContext) {
   const provider = new GitPanelViewProvider(vscode.Uri.file(__dirname), context, gitService)
   vscode.window.registerWebviewViewProvider(GitPanelViewProvider.viewType, provider)
 
-  const gitChangesProvider = new GitChangesProvider()
+  const gitChangesProvider = GitChangesProvider.getInstance()
   vscode.window.createTreeView('git-panel.changes', {
     treeDataProvider: gitChangesProvider,
     showCollapseAll: true,
