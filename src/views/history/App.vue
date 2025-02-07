@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+
 import GitGraph from './components/GitGraph.vue'
 
-interface Commit {
-  hash: string
-  author_name: string
-  author_email: string
-  message: string
-  body: string
-  parents?: string[]
-  date: string
+import { CHANNEL, WEBVIEW_CHANNEL } from '@/channel/constant'
+
+import type { Commit } from '@/git'
+
+declare global {
+  interface Window {
+    vscode: WebviewApi<State>
+  }
 }
 
 interface State {
@@ -24,15 +25,15 @@ const selectedHash = ref<string>('')
 const filter = ref<string>('')
 
 // VSCode webview API
-declare const acquireVsCodeApi: any
-const vscode = acquireVsCodeApi()
+const vscode = acquireVsCodeApi<State>()
+window.vscode = vscode
 
 // Handle messages from extension
 window.addEventListener('message', (event: { data: any }) => {
   const message = event.data
   switch (message.command) {
-    case 'history':
-      commits.value = message.data
+    case CHANNEL.HISTORY:
+      commits.value = message.data as Commit[]
       break
     case 'error':
       error.value = message.message
@@ -44,10 +45,7 @@ window.addEventListener('message', (event: { data: any }) => {
 watch([commits, selectedHash, filter], () => {
   try {
     const state: State = {
-      commits: commits.value.map(commit => ({
-        ...commit,
-        parents: Array.isArray(commit.parents) ? [...commit.parents] : [],
-      })),
+      commits: commits.value || [],
       selectedHash: selectedHash.value || '',
       filter: filter.value || '',
     }
@@ -65,17 +63,11 @@ watch([commits, selectedHash, filter], () => {
 
 onMounted(() => {
   // Request git history
-  vscode.postMessage({ command: 'getHistory', forceRefresh: true })
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_HISTORY, forceRefresh: true })
 })
 
 const transformedCommits = computed(() => {
-  return commits.value.map(commit => ({
-    hash: commit.hash,
-    message: commit.message,
-    author: commit.author_name,
-    date: commit.date,
-    parents: commit.parents || [],
-  }))
+  return commits.value
 })
 </script>
 

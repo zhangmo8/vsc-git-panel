@@ -38,10 +38,17 @@
   ],
   "contributes": {
     "viewsContainers": {
-      "panel": [
+      "activitybar": [
         {
           "id": "git-panel",
           "title": "Git Panel",
+          "icon": "$(git-commit)"
+        }
+      ],
+      "panel": [
+        {
+          "id": "git-panel",
+          "title": "GitPanel",
           "icon": "res/icon.png"
         }
       ]
@@ -49,9 +56,9 @@
     "views": {
       "git-panel": [
         {
+          "type": "webview",
           "id": "git-panel.history",
           "name": "Git Panel",
-          "type": "webview",
           "icon": "$(repo-forked)",
           "contextualTitle": "History"
         },
@@ -65,31 +72,31 @@
     },
     "commands": [
       {
-        "category": "Git Panel",
+        "category": "GitPanel",
         "command": "git-panel.history",
         "title": "History",
         "icon": "$(history)"
       },
       {
-        "category": "Git Panel",
+        "category": "GitPanel",
         "command": "git-panel.history.filter",
         "title": "Git History Filter",
         "icon": "$(filter)"
       },
       {
-        "category": "Git Panel",
+        "category": "GitPanel",
         "command": "git-panel.history.clear",
         "title": "Clear Selection",
         "icon": "$(clear-all)"
       },
       {
-        "category": "Git Panel",
+        "category": "GitPanel",
         "command": "git-panel.history.refresh",
         "title": "Refresh History",
         "icon": "$(refresh)"
       },
       {
-        "category": "Git Panel",
+        "category": "GitPanel",
         "command": "git-panel.history.switch.branch",
         "title": "Select Branch",
         "icon": "$(git-branch)"
@@ -121,8 +128,8 @@
     }
   },
   "scripts": {
-    "build": "vite build && tsup src/index.ts --external vscode",
-    "dev": "nr build --watch",
+    "build": "cross-env NODE_ENV=production vite build && tsup src/index.ts --external vscode",
+    "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development tsup src/index.ts --external vscode --watch\"",
     "prepare": "nr update",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
@@ -147,6 +154,8 @@
     "@vue/tsconfig": "^0.7.0",
     "bumpp": "^9.5.1",
     "concurrently": "^9.1.2",
+    "cross-env": "^7.0.3",
+    "dayjs": "^1.11.13",
     "eslint": "^9.9.0",
     "esno": "^4.7.0",
     "pnpm": "^9.7.1",

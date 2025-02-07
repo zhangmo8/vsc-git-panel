@@ -1,3 +1,5 @@
+import { resolve } from 'node:path'
+import process from 'node:process'
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
@@ -5,6 +7,19 @@ import vue from '@vitejs/plugin-vue'
 export default defineConfig({
   base: './',
   plugins: [vue()],
+  resolve: {
+    alias: {
+      '@': resolve(__dirname, './src'),
+    },
+  },
+  server: {
+    port: 5173,
+    cors: true,
+    hmr: true,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+    },
+  },
   build: {
     lib: {
       entry: './src/views/index.ts',
@@ -13,10 +28,5 @@ export default defineConfig({
     },
     emptyOutDir: false,
     outDir: 'dist',
-  },
-  define: {
-    'process.env.NODE_ENV': '"production"',
-    'process.env': '{}',
-    'process': '{}',
   },
 })

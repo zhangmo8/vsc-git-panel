@@ -1,21 +1,29 @@
 import type * as vscode from 'vscode'
-import { Uri } from 'vscode'
-import type { ListLogLine } from 'simple-git'
-import { GitService } from '@/git'
+import { Uri, commands } from 'vscode'
+
+import { DiffViewService } from './diff/DiffViewService'
+
+import type { GitService } from '@/git'
 import { StorageService } from '@/storage'
+import { CHANNEL, WEBVIEW_CHANNEL } from '@/channel/constant'
+
+import type { Commit } from '@/git/types'
 
 export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private gitService: GitService
   private storageService: StorageService
+  private diffViewService: DiffViewService
   public static readonly viewType = 'git-panel.history'
   private _view?: vscode.WebviewView
 
   constructor(
     private readonly _extensionUri: Uri,
     context: vscode.ExtensionContext,
+    gitService: GitService,
   ) {
-    this.gitService = new GitService()
+    this.gitService = gitService
     this.storageService = new StorageService(context)
+    this.diffViewService = DiffViewService.getInstance()
   }
 
   public resolveWebviewView(
@@ -26,6 +34,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
+        Uri.joinPath(this._extensionUri, '../'),
         Uri.joinPath(this._extensionUri),
       ],
     }
@@ -35,35 +44,42 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     // Handle messages from webview
     webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.command) {
-        case 'getHistory':
+        case WEBVIEW_CHANNEL.GET_HISTORY:
           try {
-            // Try to get commits from storage first
             let commits = this.storageService.getCommits()
-            // If no stored commits or force refresh, get from git
             if (commits.length === 0 || message.forceRefresh) {
               const history = await this.gitService.getHistory()
 
-              // 确保只传递可序列化的数据
               commits = history.all.map(commit => ({
-                hash: commit.hash,
-                date: commit.date,
-                message: commit.message,
-                author_name: commit.author_name,
-                author_email: commit.author_email,
-              }) as ListLogLine)
+                ...commit,
+                authorName: commit.author_name,
+                authorEmail: commit.author_email,
+              }) as Commit)
 
-              // Store the new commits
               this.storageService.saveCommits(commits)
             }
 
             webviewView.webview.postMessage({
-              command: 'history',
+              command: CHANNEL.HISTORY,
               data: commits,
             })
           }
           catch (error) {
             webviewView.webview.postMessage({
               command: 'Failed to get git history',
+              message: `${error}`,
+            })
+          }
+          break
+
+        case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
+          try {
+            this.diffViewService.showCommitFiles(message.commit.hash)
+            await commands.executeCommand('git.showCommitDetails', message.commit.hash)
+          }
+          catch (error) {
+            webviewView.webview.postMessage({
+              command: 'Failed to show commit details',
               message: `${error}`,
             })
           }
@@ -76,13 +92,13 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview) {
-    const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(
-        this._extensionUri,
-        'views.es.js',
-      ),
-    )
+  private _getHtmlForWebview(_webview: vscode.Webview) {
+    // const scriptUri = process.env.NODE_ENV === 'development'
+    //   ? 'http://localhost:5173/src/views/history/index.ts'
+    //   : webview.asWebviewUri(
+    //     Uri.joinPath(this._extensionUri, 'views.es.js'),
+    //   )
+    const scriptUri = 'http://localhost:5173/src/views/history/index.ts'
 
     return `<!doctype html>
               <html lang="en">
@@ -90,6 +106,18 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
                   <meta charset="UTF-8">
                   <meta name="viewport" content="width=device-width, initial-scale=1.0">
                   <title>Git Panel</title>
+                  <style>
+                    body {
+                      margin: 0;
+                      padding: 0;
+                    }
+                    
+                    * {
+                      box-sizing: border-box;
+                      -moz-box-sizing: border-box;
+                      -webkit-box-sizing: border-box;
+                    }
+                  </style>
                 </head>
                 <body>
                   <div id="app"></div>
