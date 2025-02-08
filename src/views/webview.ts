@@ -1,6 +1,5 @@
 import type * as vscode from 'vscode'
 import { Uri, commands } from 'vscode'
-import type { ListLogLine } from 'simple-git'
 
 import { DiffProvider } from './diff/DiffProvider'
 
@@ -15,7 +14,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private storageService: StorageService
   private gitChangesProvider: DiffProvider
   public static readonly viewType = 'git-panel.history'
-  private _commits: ListLogLine[] = []
+  private _commits: Commit[] = []
 
   constructor(
     private readonly _extensionUri: Uri,
@@ -52,7 +51,8 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
                 ...commit,
                 authorName: commit.author_name,
                 authorEmail: commit.author_email,
-              }) as Commit)
+                body: commit.body || '',
+              }))
 
               this.storageService.saveCommits(this._commits)
             }
