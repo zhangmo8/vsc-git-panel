@@ -15,6 +15,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private gitChangesProvider: DiffProvider
   public static readonly viewType = 'git-panel.history'
   private _commits: Commit[] = []
+  private _view?: vscode.WebviewView
 
   constructor(
     private readonly _extensionUri: Uri,
