@@ -1,3 +1,4 @@
+import process from 'node:process'
 import type * as vscode from 'vscode'
 import { Uri, commands } from 'vscode'
 
@@ -90,13 +91,12 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  private _getHtmlForWebview(_webview: vscode.Webview) {
-    // const scriptUri = process.env.NODE_ENV === 'development'
-    //   ? 'http://localhost:5173/src/views/history/index.ts'
-    //   : webview.asWebviewUri(
-    //     Uri.joinPath(this._extensionUri, 'views.es.js'),
-    //   )
-    const scriptUri = 'http://localhost:5173/src/views/history/index.ts'
+  private _getHtmlForWebview(webview: vscode.Webview) {
+    const scriptUri = process.env.NODE_ENV === 'development'
+      ? 'http://localhost:5173/src/views/history/index.ts'
+      : webview.asWebviewUri(
+        Uri.joinPath(this._extensionUri, 'views.es.js'),
+      )
 
     return `<!doctype html>
               <html lang="en">

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 
-import GitGraph from './components/GitGraph.vue'
+import CommitTable from './components/CommitTable.vue'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
@@ -72,19 +72,11 @@ const transformedCommits = computed(() => {
 
 <template>
   <div class="git-panel">
-    <div class="toolbar">
-      <input
-        v-model="filter"
-        type="text"
-        placeholder="Search commits..."
-        class="search-input"
-      >
-    </div>
+    <!-- <div class="toolbar">
+      <input v-model="filter" type="text" placeholder="Search commits..." class="search-input">
+    </div> -->
 
-    <GitGraph
-      :commits="transformedCommits"
-      class="git-graph-container"
-    />
+    <CommitTable :commits="transformedCommits" class="git-graph-container" />
 
     <div v-if="error" class="error">
       {{ error }}
