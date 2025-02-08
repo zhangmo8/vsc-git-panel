@@ -31,6 +31,7 @@ window.vscode = vscode
 // Handle messages from extension
 window.addEventListener('message', (event: { data: any }) => {
   const message = event.data
+
   switch (message.command) {
     case CHANNEL.HISTORY:
       commits.value = message.commits as Commit[]
@@ -40,26 +41,6 @@ window.addEventListener('message', (event: { data: any }) => {
       break
   }
 })
-
-// Save state when it changes
-watch([commits, selectedHash, filter], () => {
-  try {
-    const state: State = {
-      commits: commits.value || [],
-      selectedHash: selectedHash.value || '',
-      filter: filter.value || '',
-    }
-    vscode.postMessage({ command: 'setState', state })
-  }
-  catch (err) {
-    console.error('Failed to save state:', err)
-  }
-}, { deep: true })
-
-// function refreshHistory() {
-//   commits.value = []
-//   vscode.postMessage({ command: 'getHistory', forceRefresh: true })
-// }
 
 onMounted(() => {
   vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_HISTORY })

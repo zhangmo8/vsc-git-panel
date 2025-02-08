@@ -74,4 +74,15 @@ export class GitService {
       return null
     }
   }
+
+  static toGitUri(uri: vscode.Uri, ref: string): vscode.Uri {
+    return uri.with({
+      scheme: 'git',
+      path: uri.path,
+      query: JSON.stringify({
+        path: uri.path,
+        ref,
+      }),
+    })
+  }
 }

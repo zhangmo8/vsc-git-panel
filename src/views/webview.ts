@@ -26,9 +26,41 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     this._commits = this.storageService.getCommits()
   }
 
+  public async refreshHistory(forceRefresh: boolean = false) {
+    if (!this._view)
+      return
+
+    try {
+      if (this._commits.length === 0 || forceRefresh) {
+        const history = await this.gitService.getHistory()
+
+        this._commits = history.all.map(commit => ({
+          ...commit,
+          authorName: commit.author_name,
+          authorEmail: commit.author_email,
+          body: commit.body || '',
+        }))
+
+        this.storageService.saveCommits(this._commits)
+      }
+
+      this._view.webview.postMessage({
+        command: CHANNEL.HISTORY,
+        commits: this._commits,
+      })
+    }
+    catch (error) {
+      this._view.webview.postMessage({
+        command: 'Failed to get git history',
+        message: `${error}`,
+      })
+    }
+  }
+
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
   ) {
+    this._view = webviewView
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
@@ -43,31 +75,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage(async (message) => {
       switch (message.command) {
         case WEBVIEW_CHANNEL.GET_HISTORY:
-          try {
-            if (this._commits.length === 0 || message.forceRefresh) {
-              const history = await this.gitService.getHistory()
-
-              this._commits = history.all.map(commit => ({
-                ...commit,
-                authorName: commit.author_name,
-                authorEmail: commit.author_email,
-                body: commit.body || '',
-              }))
-
-              this.storageService.saveCommits(this._commits)
-            }
-
-            webviewView.webview.postMessage({
-              command: CHANNEL.HISTORY,
-              commits: this._commits,
-            })
-          }
-          catch (error) {
-            webviewView.webview.postMessage({
-              command: 'Failed to get git history',
-              message: `${error}`,
-            })
-          }
+          await this.refreshHistory(message.forceRefresh)
           break
 
         case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
