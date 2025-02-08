@@ -1,4 +1,3 @@
-import process from 'node:process'
 import type * as vscode from 'vscode'
 import { Uri, commands } from 'vscode'
 
@@ -92,36 +91,54 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   }
 
   private _getHtmlForWebview(webview: vscode.Webview) {
-    const scriptUri = process.env.NODE_ENV === 'development'
-      ? 'http://localhost:5173/src/views/history/index.ts'
-      : webview.asWebviewUri(
-        Uri.joinPath(this._extensionUri, 'views.es.js'),
-      )
+    // const scriptUri = process.env.NODE_ENV === 'development'
+    //   ? 'http://localhost:5173/src/views/history/index.ts'
+    //   : webview.asWebviewUri(
+    //     Uri.joinPath(this._extensionUri, 'views.es.js'),
+    //   )
+
+    const scriptUri = webview.asWebviewUri(
+      Uri.joinPath(this._extensionUri, 'views.es.js'),
+    )
+
+    const styleUri = webview.asWebviewUri(
+      Uri.joinPath(this._extensionUri, 'views.css'),
+    )
+
+    const nonce = getNonce()
 
     return `<!doctype html>
-              <html lang="en">
-                <head>
-                  <meta charset="UTF-8">
-                  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-                  <title>Git Panel</title>
-                  <style>
-                    body {
-                      margin: 0;
-                      padding: 0;
-                    }
-                    
-                    * {
-                      box-sizing: border-box;
-                      -moz-box-sizing: border-box;
-                      -webkit-box-sizing: border-box;
-                    }
-                  </style>
-                </head>
-                <body>
-                  <div id="app"></div>
-                  <script crossorigin type="module" src="${scriptUri}"></script>
-                </body>
-              </html>
-              `
+            <html lang="en">
+              <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>Git Panel</title>
+                <link rel="stylesheet" type="text/css" href="${styleUri}">
+                <style>
+                  body {
+                    margin: 0;
+                    padding: 0;
+                  }
+                  
+                  * {
+                    box-sizing: border-box;
+                    -moz-box-sizing: border-box;
+                    -webkit-box-sizing: border-box;
+                  }
+                </style>
+              </head>
+              <body>
+                <div id="app"></div>
+                <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
+              </body>
+            </html>`
   }
+}
+
+function getNonce() {
+  let text = ''
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  for (let i = 0; i < 32; i++)
+    text += possible.charAt(Math.floor(Math.random() * possible.length))
+  return text
 }

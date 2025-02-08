@@ -6,10 +6,13 @@ export default defineConfig({
     'src/index.ts',
   ],
   format: ['cjs'],
-  shims: false,
+  shims: true,
   dts: false,
   external: [
     'vscode',
+  ],
+  noExternal: [
+    'simple-git'
   ],
   esbuildOptions(options) {
     options.alias = {

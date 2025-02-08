@@ -2,7 +2,7 @@
   "publisher": "zhangmo8",
   "name": "git-panel",
   "displayName": "Git Panel",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "packageManager": "pnpm@9.7.1",
   "description": "",
@@ -128,14 +128,14 @@
     }
   },
   "scripts": {
-    "build": "cross-env NODE_ENV=production vite build && tsup src/index.ts --external vscode",
-    "dev": "concurrently \"vite\" \"cross-env NODE_ENV=development tsup src/index.ts --external vscode --watch\"",
+    "build": "vite build && tsup src/index.ts --external vscode",
+    "dev": "concurrently \"vite\" \"tsup src/index.ts --external vscode --watch\"",
     "prepare": "nr update",
     "update": "vscode-ext-gen --output src/generated/meta.ts",
     "lint": "eslint .",
     "vscode:prepublish": "nr build",
-    "publish": "vsce publish --no-dependencies",
-    "pack": "vsce package --no-dependencies",
+    "publish": "vsce publish",
+    "pack": "vsce package",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
     "release": "bumpp && nr publish"
