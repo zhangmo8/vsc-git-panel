@@ -22,7 +22,7 @@ export default defineConfig({
   },
   build: {
     lib: {
-      entry: './src/views/index.ts',
+      entry: './src/views/history/index.ts',
       formats: ['es'],
       fileName: format => `views.${format}.js`,
     },
