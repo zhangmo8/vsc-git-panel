@@ -1,3 +1,3 @@
-export * from './GitChangesProvider'
-export * from './CommitNode'
+export * from './DiffProvider'
+export * from './entity/CommitNode'
 export * from './types'

@@ -12,6 +12,10 @@ export interface Commit extends ListLogLine {
     additions: number
     deletions: number
   }
+  files?: Array<{
+    path: string
+    status: string
+  }>
 }
 
 export interface CommitStats {

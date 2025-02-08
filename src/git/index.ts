@@ -62,4 +62,15 @@ export class GitService {
       throw error
     }
   }
+
+  async getParentCommit(commitHash: string): Promise<string | null> {
+    try {
+      const result = await this.git.raw(['rev-parse', `${commitHash}^`])
+      return result.trim()
+    }
+    catch (error) {
+      console.error('Failed to get parent commit:', error)
+      return null
+    }
+  }
 }

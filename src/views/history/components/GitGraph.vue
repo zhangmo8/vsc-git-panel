@@ -3,7 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue'
 import dayjs from 'dayjs'
 
 import type { Commit } from '@/git'
-import { WEBVIEW_CHANNEL } from '@/channel/constant'
+import { WEBVIEW_CHANNEL } from '@/constant'
 
 const props = defineProps<{
   commits: Commit[]

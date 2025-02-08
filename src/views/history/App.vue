@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 
 import GitGraph from './components/GitGraph.vue'
 
-import { CHANNEL, WEBVIEW_CHANNEL } from '@/channel/constant'
+import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
 import type { Commit } from '@/git'
 
@@ -62,7 +62,6 @@ watch([commits, selectedHash, filter], () => {
 // }
 
 onMounted(() => {
-  // Request git history
   vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_HISTORY })
 })
 

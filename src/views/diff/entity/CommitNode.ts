@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import type { DiffTreeItem } from './types'
+import type { DiffTreeItem } from '../types'
 
 export class CommitNode extends vscode.TreeItem {
   constructor(

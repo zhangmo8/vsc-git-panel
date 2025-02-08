@@ -1,5 +1,5 @@
 import * as vscode from 'vscode'
-import type { FileTreeItem } from './types'
+import type { FileTreeItem } from '../types'
 
 export class FileNode extends vscode.TreeItem {
   constructor(
@@ -11,9 +11,9 @@ export class FileNode extends vscode.TreeItem {
     this.tooltip = `${status} ${path}`
     this.iconPath = this.getIconForStatus(status)
     this.command = {
-      command: 'git.openChange',
+      command: 'vscGitPanel.openDiff',
       title: 'Show Changes',
-      arguments: [this]
+      arguments: [{ path: this.path, status: this.status }],
     }
   }
 

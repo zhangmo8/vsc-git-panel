@@ -1,24 +1,22 @@
-import * as vscode from 'vscode'
-import { FileNode } from './FileNode'
+import { FileNode } from './entity/FileNode'
 import type { GitService } from '@/git'
+import type { StorageService } from '@/storage'
 
-export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
-  private _onDidChangeTreeData: vscode.EventEmitter<FileNode | undefined | null | void> = new vscode.EventEmitter<FileNode | undefined | null | void>()
-  readonly onDidChangeTreeData: vscode.Event<FileNode | undefined | null | void> = this._onDidChangeTreeData.event
+export class FileTreeProvider {
   private gitService: GitService
+  private storageService: StorageService
   private commitHash: string = ''
 
-  constructor(gitService: GitService) {
+  constructor(gitService: GitService, storageService: StorageService) {
     this.gitService = gitService
+    this.storageService = storageService
   }
 
   refresh(commitHash: string): void {
+    if (commitHash === this.commitHash) {
+      return
+    }
     this.commitHash = commitHash
-    this._onDidChangeTreeData.fire()
-  }
-
-  getTreeItem(element: FileNode): vscode.TreeItem {
-    return element
   }
 
   async getChildren(): Promise<FileNode[]> {
@@ -26,25 +24,35 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
       return []
 
     try {
-      // Get detailed file changes from the commit
+      const commit = this.storageService.getCommit(this.commitHash)
+
+      if (!commit) {
+        return []
+      }
+
+      if (commit.files && commit.files.length > 0) {
+        return commit.files.map(file => new FileNode(file.path, file.status))
+      }
+
       const showResult = await this.gitService.git.show([
-        '--name-status',  // Show only names and status of changed files
-        '--pretty=format:', // Don't show commit info
-        '-M',             // Detect renames
-        '-C',             // Detect copies
-        this.commitHash
+        '--name-status',
+        '--pretty=format:',
+        '-M',
+        '-C',
+        this.commitHash,
       ])
 
-      // Parse the output to get file status
       const fileChanges = showResult
         .trim()
         .split('\n')
         .filter(line => line.length > 0)
-        .map(line => {
+        .map((line) => {
           const [status, ...pathParts] = line.split('\t')
           const path = pathParts.join('\t') // Handle paths with tabs
           return { status, path }
         })
+
+      this.storageService.updateCommitFiles(this.commitHash, fileChanges)
 
       return fileChanges.map(({ status, path }) => new FileNode(
         path,
@@ -59,13 +67,13 @@ export class FileTreeProvider implements vscode.TreeDataProvider<FileNode> {
 
   private parseGitStatus(status: string): string {
     const statusMap: { [key: string]: string } = {
-      'M': 'M', // Modified
-      'A': 'A', // Added
-      'D': 'D', // Deleted
-      'R': 'R', // Renamed
-      'C': 'C', // Copied
-      'T': 'M', // Type changed (treated as modified)
-      'U': 'U', // Unmerged
+      M: 'M', // Modified
+      A: 'A', // Added
+      D: 'D', // Deleted
+      R: 'R', // Renamed
+      C: 'C', // Copied
+      T: 'M', // Type changed (treated as modified)
+      U: 'U', // Unmerged
     }
     return statusMap[status.charAt(0)] || '?'
   }

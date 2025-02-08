@@ -1,27 +1,30 @@
 import * as vscode from 'vscode'
-import { GitService } from '../../git'
-import { CommitNode } from './CommitNode'
+import { CommitNode } from './entity/CommitNode'
 import { FileTreeProvider } from './FileTreeProvider'
 import type { CommitDetails } from './types'
+import { StorageService } from '@/storage'
+import { GitService } from '@/git'
 
-export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
+export class DiffProvider implements vscode.TreeDataProvider<CommitNode> {
   private _onDidChangeTreeData: vscode.EventEmitter<CommitNode | undefined | null | void> = new vscode.EventEmitter<CommitNode | undefined | null | void>()
   readonly onDidChangeTreeData: vscode.Event<CommitNode | undefined | null | void> = this._onDidChangeTreeData.event
   private gitService: GitService
+  private storageService: StorageService
   private fileTreeProvider: FileTreeProvider
   private selectedCommitHash?: string
-  private static instance: GitChangesProvider
+  private static instance: DiffProvider
 
   private constructor() {
     this.gitService = new GitService()
-    this.fileTreeProvider = new FileTreeProvider(this.gitService)
+    this.storageService = StorageService.getInstance()
+    this.fileTreeProvider = new FileTreeProvider(this.gitService, this.storageService)
   }
 
-  static getInstance(): GitChangesProvider {
-    if (!GitChangesProvider.instance) {
-      GitChangesProvider.instance = new GitChangesProvider()
+  static getInstance(): DiffProvider {
+    if (!DiffProvider.instance) {
+      DiffProvider.instance = new DiffProvider()
     }
-    return GitChangesProvider.instance
+    return DiffProvider.instance
   }
 
   refresh(commitHash?: string): void {
@@ -35,19 +38,33 @@ export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
 
   private async getCommitByHash(hash?: string): Promise<CommitDetails | null> {
     try {
-      const history = await this.gitService.getHistory()
-      if (history.all.length === 0) {
-        return null
+      if (!hash) {
+        throw new Error('Commit hash is required')
       }
 
-      const commit = history.all.find(c => c.hash === hash) || history.all[0]
-      return {
-        hash: commit.hash,
-        authorName: commit.author_name,
-        authorEmail: commit.author_email,
-        date: commit.date,
-        stats: commit.stats,
+      // First try to get from cache
+      let commit = this.storageService.getCommit(hash)
+
+      if (!commit) {
+        // Only fetch all commits if not found in cache
+        const history = await this.gitService.getHistory()
+        const historyCommit = history.all.find(c => c.hash === hash)
+        if (!historyCommit) {
+          return null
+        }
+
+        commit = {
+          hash: historyCommit.hash,
+          authorName: historyCommit.author_name,
+          authorEmail: historyCommit.author_email,
+          date: historyCommit.date,
+          message: historyCommit.message,
+          body: historyCommit.body,
+          stats: historyCommit.stats,
+        }
       }
+
+      return commit
     }
     catch (error) {
       console.error('Error getting commit details:', error)
@@ -56,17 +73,15 @@ export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
   }
 
   async getChildren(element?: CommitNode): Promise<CommitNode[]> {
-    if (!element) {
+    if (!element && this.selectedCommitHash) {
       const commitDetails = await this.getCommitByHash(this.selectedCommitHash)
 
       if (!commitDetails) {
         return []
       }
 
-      // Refresh the file tree provider with current commit hash
       this.fileTreeProvider.refresh(commitDetails.hash)
 
-      // Get changed files from FileTreeProvider
       const changedFiles = await this.fileTreeProvider.getChildren()
 
       return [
@@ -97,10 +112,12 @@ export class GitChangesProvider implements vscode.TreeDataProvider<CommitNode> {
         ),
       ]
     }
-    else if (element.children) {
-      return element.children as CommitNode[]
-    }
 
-    return []
+    return element?.children as CommitNode[] || []
+  }
+
+  // Getter for selectedCommitHash
+  public getSelectedCommitHash(): string | undefined {
+    return this.selectedCommitHash
   }
 }

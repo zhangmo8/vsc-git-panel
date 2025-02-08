@@ -2,41 +2,34 @@ import type * as vscode from 'vscode'
 import { Uri, commands } from 'vscode'
 import type { ListLogLine } from 'simple-git'
 
-import { DiffViewService } from './diff/DiffViewService'
-import { GitChangesProvider } from './diff/GitChangesProvider'
+import { DiffProvider } from './diff/DiffProvider'
 
 import type { GitService } from '@/git'
 import { StorageService } from '@/storage'
-import { CHANNEL, WEBVIEW_CHANNEL } from '@/channel/constant'
+import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
 import type { Commit } from '@/git/types'
 
 export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private gitService: GitService
   private storageService: StorageService
-  private diffViewService: DiffViewService
-  private gitChangesProvider: GitChangesProvider
+  private gitChangesProvider: DiffProvider
   public static readonly viewType = 'git-panel.history'
-  private _view?: vscode.WebviewView
   private _commits: ListLogLine[] = []
 
   constructor(
     private readonly _extensionUri: Uri,
-    context: vscode.ExtensionContext,
     gitService: GitService,
   ) {
     this.gitService = gitService
-    this.storageService = new StorageService(context)
-    this.diffViewService = DiffViewService.getInstance()
-    this.gitChangesProvider = GitChangesProvider.getInstance()
+    this.storageService = StorageService.getInstance()
+    this.gitChangesProvider = DiffProvider.getInstance()
     this._commits = this.storageService.getCommits()
   }
 
   public resolveWebviewView(
     webviewView: vscode.WebviewView,
   ) {
-    this._view = webviewView
-
     webviewView.webview.options = {
       enableScripts: true,
       localResourceRoots: [
@@ -79,7 +72,6 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
 
         case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
           try {
-            this.diffViewService.showCommitFiles(message.commitHash)
             this.gitChangesProvider.refresh(message.commitHash)
             await commands.executeCommand('git.showCommitDetails', message.commitHash)
           }
