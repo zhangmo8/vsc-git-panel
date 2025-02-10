@@ -7,10 +7,15 @@ import type { ExtendedLogResult } from './types'
 export * from './types'
 
 export class GitService {
-  private readonly rootRepoPath = vscode.workspace.workspaceFolders![0].uri.fsPath
+  private readonly rootRepoPath: string
   private _git: SimpleGit
 
   constructor() {
+    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
+      throw new Error('No workspace folder found. Please open a folder first.')
+
+    this.rootRepoPath = vscode.workspace.workspaceFolders[0].uri.fsPath
+    
     try {
       this._git = simpleGit(this.rootRepoPath, {
         binary: 'git',
@@ -63,7 +68,7 @@ export class GitService {
     }
   }
 
-  async getParentCommit(commitHash: string): Promise<string | null> {
+  async getPreviousCommit(commitHash: string): Promise<string | null> {
     try {
       const result = await this.git.raw(['rev-list', '--parents', '-n', '1', commitHash])
       const [, parentHash] = result.trim().split(' ')

@@ -20,9 +20,9 @@ export default function diffCommand(gitService: GitService, diffProvider: DiffPr
     // For modified files, show diff between current commit and its parent
     if (fileInfo.status === 'M') {
       try {
-        const parentCommit = await gitService.getParentCommit(commit)
-        if (parentCommit) {
-          const leftUri = GitService.toGitUri(uri, parentCommit)
+        const previousCommit = await gitService.getPreviousCommit(commit)
+        if (previousCommit) {
+          const leftUri = GitService.toGitUri(uri, previousCommit)
           const rightUri = GitService.toGitUri(uri, commit)
           await vscode.commands.executeCommand('vscode.diff', leftUri, rightUri, title)
           return

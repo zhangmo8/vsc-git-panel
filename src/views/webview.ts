@@ -4,6 +4,7 @@ import { Uri, commands } from 'vscode'
 import { DiffProvider } from './diff/DiffProvider'
 
 import type { GitService } from '@/git'
+import { GitChangeMonitor } from '@/git/GitChangeMonitor'
 import { StorageService } from '@/storage'
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
@@ -13,6 +14,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   private gitService: GitService
   private storageService: StorageService
   private gitChangesProvider: DiffProvider
+  private _gitChangeMonitor: GitChangeMonitor
   public static readonly viewType = 'git-panel.history'
   private _commits: Commit[] = []
   private _view?: vscode.WebviewView
@@ -24,6 +26,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     this.gitService = gitService
     this.storageService = StorageService.getInstance()
     this.gitChangesProvider = DiffProvider.getInstance()
+this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
     this._commits = this.storageService.getCommits()
   }
 
