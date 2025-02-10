@@ -2,7 +2,7 @@
   "publisher": "zhangmo8",
   "name": "git-panel",
   "displayName": "Git Panel",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "packageManager": "pnpm@9.7.1",
   "description": "",
