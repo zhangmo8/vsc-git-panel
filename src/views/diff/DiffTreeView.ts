@@ -1,30 +1,33 @@
-import * as vscode from 'vscode'
+import type { Event, TreeDataProvider, TreeItem } from 'vscode'
+import { EventEmitter, TreeItemCollapsibleState } from 'vscode'
+
 import { CommitNode } from './entity/CommitNode'
-import { FileTreeProvider } from './FileTreeProvider'
+import { FileTreeView } from './FileTreeView'
 import type { CommitDetails } from './types'
+
 import { StorageService } from '@/storage'
 import { GitService } from '@/git'
 
-export class DiffProvider implements vscode.TreeDataProvider<CommitNode> {
-  private _onDidChangeTreeData: vscode.EventEmitter<CommitNode | undefined | null | void> = new vscode.EventEmitter<CommitNode | undefined | null | void>()
-  readonly onDidChangeTreeData: vscode.Event<CommitNode | undefined | null | void> = this._onDidChangeTreeData.event
+export class DiffTreeView implements TreeDataProvider<CommitNode> {
+  private _onDidChangeTreeData: EventEmitter<CommitNode | undefined | null | void> = new EventEmitter<CommitNode | undefined | null | void>()
+  readonly onDidChangeTreeData: Event<CommitNode | undefined | null | void> = this._onDidChangeTreeData.event
   private gitService: GitService
   private storageService: StorageService
-  private fileTreeProvider: FileTreeProvider
+  private fileTreeProvider: FileTreeView
   private selectedCommitHash?: string
-  private static instance: DiffProvider
+  private static instance: DiffTreeView
 
   private constructor() {
     this.gitService = new GitService()
     this.storageService = StorageService.getInstance()
-    this.fileTreeProvider = new FileTreeProvider(this.gitService, this.storageService)
+    this.fileTreeProvider = new FileTreeView(this.gitService, this.storageService)
   }
 
-  static getInstance(): DiffProvider {
-    if (!DiffProvider.instance) {
-      DiffProvider.instance = new DiffProvider()
+  static getInstance(): DiffTreeView {
+    if (!DiffTreeView.instance) {
+      DiffTreeView.instance = new DiffTreeView()
     }
-    return DiffProvider.instance
+    return DiffTreeView.instance
   }
 
   refresh(commitHash?: string): void {
@@ -32,7 +35,7 @@ export class DiffProvider implements vscode.TreeDataProvider<CommitNode> {
     this._onDidChangeTreeData.fire()
   }
 
-  getTreeItem(element: CommitNode): vscode.TreeItem {
+  getTreeItem(element: CommitNode): TreeItem {
     return element
   }
 
@@ -88,25 +91,25 @@ export class DiffProvider implements vscode.TreeDataProvider<CommitNode> {
         new CommitNode(
           'Author',
           `${commitDetails.authorName} <${commitDetails.authorEmail}>`,
-          vscode.TreeItemCollapsibleState.None,
+          TreeItemCollapsibleState.None,
           'person',
         ),
         new CommitNode(
           'Date',
           new Date(commitDetails.date).toLocaleString(),
-          vscode.TreeItemCollapsibleState.None,
+          TreeItemCollapsibleState.None,
           'calendar',
         ),
         new CommitNode(
           'Hash',
           commitDetails.hash,
-          vscode.TreeItemCollapsibleState.None,
+          TreeItemCollapsibleState.None,
           'git-commit',
         ),
         new CommitNode(
           'Changed Files',
           `${changedFiles.length} Files Changed`,
-          changedFiles.length > 0 ? vscode.TreeItemCollapsibleState.Expanded : vscode.TreeItemCollapsibleState.None,
+          changedFiles.length > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None,
           'files',
           changedFiles,
         ),

@@ -1,8 +1,8 @@
-import * as vscode from 'vscode'
+import { type Disposable, type FileSystemWatcher, extensions, workspace } from 'vscode'
 
 export class GitChangeMonitor {
-  private disposables: vscode.Disposable[] = []
-  private fileWatcher: vscode.FileSystemWatcher | undefined
+  private disposables: Disposable[] = []
+  private fileWatcher: FileSystemWatcher | undefined
   private retryCount = 0
 
   constructor(private readonly onGitChange: () => void) {
@@ -12,7 +12,7 @@ export class GitChangeMonitor {
 
   private setupFileSystemWatcher() {
     try {
-      this.fileWatcher = vscode.workspace.createFileSystemWatcher('**/.git/index')
+      this.fileWatcher = workspace.createFileSystemWatcher('**/.git/index')
 
       this.disposables.push(
         this.fileWatcher.onDidChange(() => {
@@ -33,7 +33,7 @@ export class GitChangeMonitor {
 
   async getGitExtension() {
     try {
-      const extension = vscode.extensions.getExtension(
+      const extension = extensions.getExtension(
         'vscode.git',
       )
 

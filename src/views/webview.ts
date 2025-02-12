@@ -1,33 +1,31 @@
-import * as vscode from 'vscode'
-import { Uri, commands } from 'vscode'
+import type { ExtensionContext, Webview, WebviewView, WebviewViewProvider } from 'vscode'
+import { ExtensionMode, Uri, commands } from 'vscode'
 
-import { DiffProvider } from './diff/DiffProvider'
+import { DiffTreeView } from './diff/DiffTreeView'
 
-import type { GitService } from '@/git'
+import type { Commit, GitService } from '@/git'
 import { GitChangeMonitor } from '@/git/GitChangeMonitor'
 import { StorageService } from '@/storage'
-import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
+import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit } from '@/git/types'
-
-export class GitPanelViewProvider implements vscode.WebviewViewProvider {
+export class GitPanelViewProvider implements WebviewViewProvider {
   private gitService: GitService
   private storageService: StorageService
-  private gitChangesProvider: DiffProvider
+  private gitChangesProvider: DiffTreeView
   private _gitChangeMonitor: GitChangeMonitor
-  public static readonly viewType = 'git-panel.history'
+  public static readonly viewType = `${EXTENSION_SYMBOL}.history`
   private _commits: Commit[] = []
-  private _view?: vscode.WebviewView
-  private _context: vscode.ExtensionContext
+  private _view?: WebviewView
+  private _context: ExtensionContext
 
   constructor(
     private readonly _extensionUri: Uri,
     gitService: GitService,
-    context: vscode.ExtensionContext,
+    context: ExtensionContext,
   ) {
     this.gitService = gitService
     this.storageService = StorageService.getInstance()
-    this.gitChangesProvider = DiffProvider.getInstance()
+    this.gitChangesProvider = DiffTreeView.getInstance()
     this._context = context
     this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
     this._commits = this.storageService.getCommits()
@@ -65,7 +63,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   }
 
   public resolveWebviewView(
-    webviewView: vscode.WebviewView,
+    webviewView: WebviewView,
   ) {
     this._view = webviewView
     webviewView.webview.options = {
@@ -105,8 +103,8 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview) {
-    const isDev = this._context.extensionMode === vscode.ExtensionMode.Development
+  private _getHtmlForWebview(webview: Webview) {
+    const isDev = this._context.extensionMode === ExtensionMode.Development
 
     const scriptUri = isDev
       ? 'http://localhost:5173/src/views/history/index.ts'

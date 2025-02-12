@@ -8,3 +8,15 @@ export const WEBVIEW_CHANNEL = {
 export const CHANNEL = {
   HISTORY: 'history',
 }
+
+export const EXTENSION_SYMBOL = 'git-panel'
+
+export const GIT_STATUS = {
+  MODIFIED: 'M',
+  ADDED: 'A',
+  DELETED: 'D',
+  RENAMED: 'R',
+  COPIED: 'C',
+  UNTRACKED: 'U',
+  IGNORED: 'I',
+}

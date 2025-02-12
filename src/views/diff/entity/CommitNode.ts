@@ -1,18 +1,20 @@
-import * as vscode from 'vscode'
+import type { TreeItemCollapsibleState } from 'vscode'
+import { ThemeIcon, TreeItem } from 'vscode'
+
 import type { DiffTreeItem } from '../types'
 
-export class CommitNode extends vscode.TreeItem {
+export class CommitNode extends TreeItem {
   constructor(
     public readonly label: string,
     public description: string,
-    public readonly collapsibleState: vscode.TreeItemCollapsibleState,
+    public readonly collapsibleState: TreeItemCollapsibleState,
     public readonly iconName: string,
     public readonly children?: any[],
   ) {
     super(label, collapsibleState)
     this.tooltip = description
     this.description = description
-    this.iconPath = new vscode.ThemeIcon(iconName)
+    this.iconPath = new ThemeIcon(iconName)
     this.children = children
   }
 

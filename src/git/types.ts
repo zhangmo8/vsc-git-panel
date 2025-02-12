@@ -3,6 +3,7 @@ import type { ListLogLine, LogResult } from 'simple-git'
 export interface CommitFile {
   path: string
   status: string
+  oldPath?: string
 }
 
 export interface Commit extends ListLogLine {

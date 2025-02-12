@@ -1,16 +1,17 @@
-import type * as vscode from 'vscode'
+import type { ExtensionContext } from 'vscode'
+
 import type { Commit } from '@/git/types'
 
 export class StorageService {
   private static readonly COMMITS_KEY = 'git-panel.commits'
   private static instance: StorageService
-  private context: vscode.ExtensionContext
+  private context: ExtensionContext
 
-  private constructor(context: vscode.ExtensionContext) {
+  private constructor(context: ExtensionContext) {
     this.context = context
   }
 
-  static initialize(context: vscode.ExtensionContext): StorageService {
+  static initialize(context: ExtensionContext): StorageService {
     if (!StorageService.instance) {
       StorageService.instance = new StorageService(context)
     }

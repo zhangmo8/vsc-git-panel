@@ -1,9 +1,9 @@
-import type * as vscode from 'vscode'
+import type { TreeItemCollapsibleState } from 'vscode'
 
 export interface DiffTreeItem {
   label: string
   description: string
-  collapsibleState: vscode.TreeItemCollapsibleState
+  collapsibleState: TreeItemCollapsibleState
   iconName: string
   fileCount?: number
   children?: DiffTreeItem[]
@@ -12,6 +12,7 @@ export interface DiffTreeItem {
 export interface FileTreeItem {
   path: string
   status: string
+  oldPath?: string
 }
 
 export interface CommitDetails {

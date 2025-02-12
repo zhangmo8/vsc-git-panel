@@ -1,3 +1,2 @@
-export * from './DiffProvider'
-export * from './entity/CommitNode'
+export * from './DiffTreeView'
 export * from './types'

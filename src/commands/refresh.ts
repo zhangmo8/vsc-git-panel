@@ -1,8 +1,10 @@
-import * as vscode from 'vscode'
+import { commands } from 'vscode'
+
 import type { GitPanelViewProvider } from '@/views/webview'
+import { EXTENSION_SYMBOL } from '@/constant'
 
 export default function refreshCommand(provider: GitPanelViewProvider) {
-  return vscode.commands.registerCommand('git-panel.history.refresh', () => {
+  return commands.registerCommand(`${EXTENSION_SYMBOL}.history.refresh`, () => {
     provider.refreshHistory(true)
   })
 }

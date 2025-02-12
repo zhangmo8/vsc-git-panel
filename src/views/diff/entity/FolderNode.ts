@@ -1,15 +1,17 @@
-import * as vscode from 'vscode'
+import { TreeItem, TreeItemCollapsibleState, Uri } from 'vscode'
 import type { FileNode } from './FileNode'
+import { EXTENSION_SYMBOL } from '@/constant'
 
-export class FolderNode extends vscode.TreeItem {
+export class FolderNode extends TreeItem {
   children: (FolderNode | FileNode)[] = []
 
   constructor(
     public readonly name: string,
     public readonly path: string,
   ) {
-    super(name, vscode.TreeItemCollapsibleState.Expanded)
-    this.iconPath = new vscode.ThemeIcon('folder')
+    super(name, TreeItemCollapsibleState.Expanded)
+    const uri = Uri.parse(`${EXTENSION_SYMBOL}:${path}?type=folder`)
+    this.resourceUri = uri
     this.contextValue = 'folder'
   }
 

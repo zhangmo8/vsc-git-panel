@@ -1,6 +1,7 @@
 import simpleGit from 'simple-git'
-import * as vscode from 'vscode'
+import { workspace } from 'vscode'
 
+import type { Uri } from 'vscode'
 import type { SimpleGit } from 'simple-git'
 import type { ExtendedLogResult } from './types'
 
@@ -11,10 +12,10 @@ export class GitService {
   private _git: SimpleGit
 
   constructor() {
-    if (!vscode.workspace.workspaceFolders || vscode.workspace.workspaceFolders.length === 0)
+    if (!workspace.workspaceFolders || workspace.workspaceFolders.length === 0)
       throw new Error('No workspace folder found. Please open a folder first.')
 
-    this.rootRepoPath = vscode.workspace.workspaceFolders[0].uri.fsPath
+    this.rootRepoPath = workspace.workspaceFolders[0].uri.fsPath
 
     try {
       this._git = simpleGit(this.rootRepoPath, {
@@ -84,7 +85,7 @@ export class GitService {
     }
   }
 
-  static toGitUri(uri: vscode.Uri, ref: string): vscode.Uri {
+  static toGitUri(uri: Uri, ref: string): Uri {
     return uri.with({
       scheme: 'git',
       path: uri.path,
