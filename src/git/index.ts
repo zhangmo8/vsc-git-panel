@@ -15,7 +15,7 @@ export class GitService {
       throw new Error('No workspace folder found. Please open a folder first.')
 
     this.rootRepoPath = vscode.workspace.workspaceFolders[0].uri.fsPath
-    
+
     try {
       this._git = simpleGit(this.rootRepoPath, {
         binary: 'git',
@@ -33,7 +33,11 @@ export class GitService {
 
   async getHistory(): Promise<ExtendedLogResult> {
     try {
-      const logResult = await this.git.log(['--max-count=100']) as ExtendedLogResult
+      const logResult = await this.git.log([
+        '--all',
+        '--max-count=100',
+        '--decorate=full',
+      ]) as ExtendedLogResult
 
       // Get stats for each commit
       for (const commit of logResult.all) {

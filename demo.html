@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Git Graph</title>
+  <style>
+    body {
+      background: #2b2b2b;
+      margin: 0;
+      padding: 20px;
+    }
+
+    .commit-node {
+      fill: #4a9eff;
+    }
+
+    .commit-node-develop {
+      fill: #ffeb3b;
+    }
+
+    .branch-line {
+      stroke-width: 2;
+      fill: none;
+    }
+
+    .main-branch {
+      stroke: #4a9eff;
+    }
+
+    .develop-branch {
+      stroke: #ffeb3b;
+    }
+
+    .commit-text {
+      font-family: Arial, sans-serif;
+      font-size: 12px;
+      fill: #fff;
+    }
+
+    .branch-label {
+      font-family: Arial, sans-serif;
+      font-size: 14px;
+      font-weight: bold;
+    }
+
+    .main-label {
+      fill: #4a9eff;
+    }
+
+    .develop-label {
+      fill: #ffeb3b;
+    }
+
+    .git-table {
+      border-collapse: collapse;
+      width: 100%;
+      position: relative;
+    }
+
+    .git-table td {
+      padding: 0;
+      height: 30px;
+      position: relative;
+    }
+
+    .git-table td:hover {
+      background-color: rgba(255, 255, 255, 0.3);
+    }
+
+    .git-cell {
+      width: 300px;
+      height: 30px;
+      position: relative;
+    }
+
+    .branch-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      pointer-events: none;
+      z-index: 1;
+    }
+
+    .commit-container {
+      position: relative;
+      z-index: 2;
+    }
+  </style>
+</head>
+
+<body>
+  <div id="app">
+    <table class="git-table" id="gitTable"></table>
+
+    <div id="branchSvg" style="position:relative;width: 500px;height: 500px;">
+      <svg style="position: absolute;" width="100%" height="100%" viewBox="0 0 500 500">
+        <text x="10" y="10" class="branch-label main-label" style="z-index: 3;" font-size="10" fill="blue">Main</text>
+        <text x="30" y="40" class="branch-label develop-label" style="z-index: 3;" font-size="10" fill="yellow">Develop</text>
+        <path d="M 10 0 V 1800" stroke="blue" stroke-width="2" fill="none" />
+        <path d="M 10 40 H 30 Q 40 40 40 50 V 210 Q 40 220 30 220 H 10" stroke="yellow" stroke-width="2" fill="none" />
+      </svg>
+      <svg style="position: absolute;" width="100%" height="100%" viewBox="0 0 500 500">
+        <circle cx="10" cy="10" r="10" fill="blue" />
+        <circle cx="10" cy="40" r="10" fill="blue" />
+        <circle cx="40" cy="70" r="10" fill="yellow" />
+        <circle cx="40" cy="100" r="10" fill="yellow" />
+        <circle cx="40" cy="130" r="10" fill="yellow" />
+        <circle cx="40" cy="160" r="10" fill="yellow" />
+        <circle cx="40" cy="190" r="10" fill="yellow" />
+
+        <circle cx="10" cy="220" r="10" fill="blue" />
+
+        <!-- <circle cx="30" cy="210" r="10" fill="red" /> -->
+      </svg>
+    </div>
+  </div>
+  <script>
+    const gitCommits = [
+      "commit",
+      "commit",
+      "branch develop",
+      "checkout develop",
+      "commit",
+      "commit",
+      "checkout main",
+      "commit",
+      "commit",
+      "checkout develop",
+      "commit",
+      "commit",
+      "commit",
+      "checkout main",
+      "merge develop",
+      "commit",
+      "commit",
+      "commit",
+    ];
+
+    function createBranchSvg() {
+      const height = gitCommits.length * 30;
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("class", "branch-svg");
+      svg.setAttribute("width", "300");
+      svg.setAttribute("height", height.toString());
+
+      // 主分支线
+      const mainLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      mainLine.setAttribute("class", "branch-line main-branch");
+      mainLine.setAttribute("d", `M50,15 L50,${height}`);
+      svg.appendChild(mainLine);
+
+      // 开发分支线和合并线
+      const developStartY = 75;
+      const developEndY = height - 120;
+
+      // 分支线 - 使用简单圆角
+      const developLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      developLine.setAttribute("class", "branch-line develop-branch");
+      developLine.setAttribute("d", `M50,${developStartY} Q100,${developStartY} 150,${developStartY + 30} L150,${developEndY}`);
+      svg.appendChild(developLine);
+
+      // 合并线 - 使用简单圆角
+      const mergeLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
+      mergeLine.setAttribute("class", "branch-line develop-branch");
+      mergeLine.setAttribute("d", `M150,${developEndY} Q100,${developEndY + 30} 50,${developEndY + 30}`);
+      svg.appendChild(mergeLine);
+
+      return svg;
+    }
+
+    function createCommitNode(x, isDevelop = false) {
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "300");
+      svg.setAttribute("height", "30");
+
+      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+      circle.setAttribute("cx", x.toString());
+      circle.setAttribute("cy", "15");
+      circle.setAttribute("r", "6");
+      circle.setAttribute("class", isDevelop ? "commit-node-develop" : "commit-node");
+
+      svg.appendChild(circle);
+      return svg;
+    }
+
+    function createGitGraph() {
+      const table = document.getElementById('gitTable');
+      const branchSvg = createBranchSvg();
+      document.getElementById('app').insertBefore(branchSvg, table);
+
+      let skipNext = false;
+
+      gitCommits.forEach((commit, index) => {
+        // 跳过分支切换的命令行
+        if (skipNext) {
+          skipNext = false;
+          return;
+        }
+
+        if (commit.includes('branch') || commit.includes('checkout')) {
+          skipNext = true;
+          return;
+        }
+
+        const row = document.createElement('tr');
+        const cell = document.createElement('td');
+        const container = document.createElement('div');
+        container.className = 'git-cell';
+
+        if (commit === "commit") {
+          // 确定当前提交属于哪个分支
+          let isDevelop = false;
+          for (let i = 0; i <= index; i++) {
+            if (gitCommits[i].includes('checkout')) {
+              isDevelop = gitCommits[i].split(' ')[1] === 'develop';
+            }
+          }
+
+          // 根据是否在develop分支上调整x坐标
+          const x = isDevelop ? 150 : 50;
+          const commitNode = createCommitNode(x, isDevelop);
+          container.appendChild(commitNode);
+        }
+
+        cell.appendChild(container);
+        row.appendChild(cell);
+        table.appendChild(row);
+      });
+    }
+
+    // createGitGraph();
+  </script>
+</body>
+
+</html>

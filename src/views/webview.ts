@@ -26,7 +26,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     this.gitService = gitService
     this.storageService = StorageService.getInstance()
     this.gitChangesProvider = DiffProvider.getInstance()
-this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
+    this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
     this._commits = this.storageService.getCommits()
   }
 
@@ -102,20 +102,18 @@ this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
     })
   }
 
-  private _getHtmlForWebview(webview: vscode.Webview) {
+  private _getHtmlForWebview(_webview: vscode.Webview) {
     // const scriptUri = process.env.NODE_ENV === 'development'
     //   ? 'http://localhost:5173/src/views/history/index.ts'
     //   : webview.asWebviewUri(
     //     Uri.joinPath(this._extensionUri, 'views.es.js'),
     //   )
 
-    const scriptUri = webview.asWebviewUri(
-      Uri.joinPath(this._extensionUri, 'views.es.js'),
-    )
+    const scriptUri = 'http://localhost:5173/src/views/history/index.ts'
 
-    const styleUri = webview.asWebviewUri(
-      Uri.joinPath(this._extensionUri, 'views.css'),
-    )
+    // const styleUri = webview.asWebviewUri(
+    //   Uri.joinPath(this._extensionUri, 'views.css'),
+    // )
 
     const nonce = getNonce()
 
@@ -125,7 +123,6 @@ this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Git Panel</title>
-                <link rel="stylesheet" type="text/css" href="${styleUri}">
                 <style>
                   body {
                     margin: 0;

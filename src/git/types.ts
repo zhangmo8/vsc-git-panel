@@ -1,5 +1,10 @@
 import type { ListLogLine, LogResult } from 'simple-git'
 
+export interface CommitFile {
+  path: string
+  status: string
+}
+
 export interface Commit extends ListLogLine {
   hash: string
   authorName: string
@@ -12,10 +17,7 @@ export interface Commit extends ListLogLine {
     additions: number
     deletions: number
   }
-  files?: Array<{
-    path: string
-    status: string
-  }>
+  files?: Array<CommitFile>
 }
 
 export interface CommitStats {
