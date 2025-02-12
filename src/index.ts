@@ -17,7 +17,7 @@ export function activate(context: vscode.ExtensionContext) {
 
   const gitService = new GitService()
 
-  const provider = new GitPanelViewProvider(vscode.Uri.file(__dirname), gitService)
+  const provider = new GitPanelViewProvider(vscode.Uri.file(__dirname), gitService, context)
   vscode.window.registerWebviewViewProvider(GitPanelViewProvider.viewType, provider)
 
   const diffProvider = DiffProvider.getInstance()

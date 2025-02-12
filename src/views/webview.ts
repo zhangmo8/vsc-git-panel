@@ -1,4 +1,4 @@
-import type * as vscode from 'vscode'
+import * as vscode from 'vscode'
 import { Uri, commands } from 'vscode'
 
 import { DiffProvider } from './diff/DiffProvider'
@@ -18,14 +18,17 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
   public static readonly viewType = 'git-panel.history'
   private _commits: Commit[] = []
   private _view?: vscode.WebviewView
+  private _context: vscode.ExtensionContext
 
   constructor(
     private readonly _extensionUri: Uri,
     gitService: GitService,
+    context: vscode.ExtensionContext,
   ) {
     this.gitService = gitService
     this.storageService = StorageService.getInstance()
     this.gitChangesProvider = DiffProvider.getInstance()
+    this._context = context
     this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
     this._commits = this.storageService.getCommits()
   }
@@ -102,18 +105,20 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
     })
   }
 
-  private _getHtmlForWebview(_webview: vscode.Webview) {
-    // const scriptUri = process.env.NODE_ENV === 'development'
-    //   ? 'http://localhost:5173/src/views/history/index.ts'
-    //   : webview.asWebviewUri(
-    //     Uri.joinPath(this._extensionUri, 'views.es.js'),
-    //   )
+  private _getHtmlForWebview(webview: vscode.Webview) {
+    const isDev = this._context.extensionMode === vscode.ExtensionMode.Development
 
-    const scriptUri = 'http://localhost:5173/src/views/history/index.ts'
+    const scriptUri = isDev
+      ? 'http://localhost:5173/src/views/history/index.ts'
+      : webview.asWebviewUri(
+        Uri.joinPath(this._extensionUri, 'views.es.js'),
+      )
 
-    // const styleUri = webview.asWebviewUri(
-    //   Uri.joinPath(this._extensionUri, 'views.css'),
-    // )
+    const styleUri = isDev
+      ? null
+      : webview.asWebviewUri(
+        Uri.joinPath(this._extensionUri, 'views.css'),
+      )
 
     const nonce = getNonce()
 
@@ -123,6 +128,7 @@ export class GitPanelViewProvider implements vscode.WebviewViewProvider {
                 <meta charset="UTF-8">
                 <meta name="viewport" content="width=device-width, initial-scale=1.0">
                 <title>Git Panel</title>
+                ${isDev ? '' : `<link rel="stylesheet" type="text/css" href="${styleUri}">`}
                 <style>
                   body {
                     margin: 0;
