@@ -86,7 +86,6 @@ export class GitPanelViewProvider implements WebviewViewProvider {
         case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
           try {
             this.gitChangesProvider.refresh(message.commitHash)
-            await commands.executeCommand('git.showCommitDetails', message.commitHash)
           }
           catch (error) {
             webviewView.webview.postMessage({
@@ -94,6 +93,9 @@ export class GitPanelViewProvider implements WebviewViewProvider {
               message: `${error}`,
             })
           }
+          break
+        case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
+            await commands.executeCommand('git-panel.changes.focus')
           break
 
         case 'clearHistory':

@@ -39,6 +39,19 @@ function handleCommitClick(commit: Commit & { date: string }) {
   }
 }
 
+function handleDoubleClick() {
+  try {
+    if (window.vscode) {
+      window.vscode.postMessage({
+        command: WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL,
+      })
+    }
+  }
+  catch (error) {
+    console.error('Error sending commit details:', error)
+  }
+}
+
 // Calculate branch positions and paths
 // const COLUMN_WIDTH = 14
 // const DOT_SIZE = 6
@@ -107,6 +120,7 @@ onUnmounted(() => {
           :key="commit.hash"
           class="commit-row"
           @click="handleCommitClick(commit)"
+          @dblclick="handleDoubleClick"
         >
           <td class="hash-col">
             {{ commit.hash.substring(0, 7) }}
