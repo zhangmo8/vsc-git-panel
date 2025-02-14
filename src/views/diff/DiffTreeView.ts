@@ -85,7 +85,7 @@ export class DiffTreeView implements TreeDataProvider<CommitNode> {
 
       this.fileTreeProvider.refresh(commitDetails.hash)
 
-      const changedFiles = await this.fileTreeProvider.getChildren()
+      const { files, total } = await this.fileTreeProvider.getChildren()
 
       return [
         new CommitNode(
@@ -108,10 +108,10 @@ export class DiffTreeView implements TreeDataProvider<CommitNode> {
         ),
         new CommitNode(
           'Changed Files',
-          `${changedFiles.length} Files Changed`,
-          changedFiles.length > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None,
+          `${total} Files Changed`,
+          total > 0 ? TreeItemCollapsibleState.Expanded : TreeItemCollapsibleState.None,
           'files',
-          changedFiles,
+          files,
         ),
       ]
     }

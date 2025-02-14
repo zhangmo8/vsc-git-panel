@@ -93,15 +93,18 @@ export class FileTreeView {
     return Array.from(root.values())
   }
 
-  async getChildren(): Promise<Array<FileNode | FolderNode>> {
+  async getChildren(): Promise<{ files: Array<FileNode | FolderNode>, total: number }> {
     if (!this.commitHash)
-      return []
+      return { files: [], total: 0 }
 
     try {
       const commit = this.storageService.getCommit(this.commitHash)
 
       if (commit?.files) {
-        return this.buildFileTree(commit.files)
+        return {
+          files: this.buildFileTree(commit.files),
+          total: commit.files.length,
+        }
       }
 
       const showResult = await this.gitService.git.show([
@@ -138,11 +141,14 @@ export class FileTreeView {
 
       this.storageService.updateCommitFiles(this.commitHash, fileChanges)
 
-      return this.buildFileTree(fileChanges)
+      return {
+        files: this.buildFileTree(fileChanges),
+        total: fileChanges.length,
+      }
     }
     catch (error) {
       console.error('Error getting commit files:', error)
-      return []
+      return { files: [], total: 0 }
     }
   }
 }
