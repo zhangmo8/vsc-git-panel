@@ -98,59 +98,39 @@ onUnmounted(() => {
 
 <template>
   <div class="git-graph">
-    <table>
-      <thead>
-        <tr>
-          <th class="hash-col">
-            CommitId
-          </th>
-          <th class="message-col">
-            Message
-          </th>
-          <th class="stats-col">
-            Changes
-          </th>
-          <th>Author</th>
-          <th>Date</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr
-          v-for="commit in visibleCommits"
-          :key="commit.hash"
-          class="commit-row"
-          @click="handleCommitClick(commit)"
-          @dblclick="handleDoubleClick"
-        >
-          <td class="hash-col">
-            {{ commit.hash.substring(0, 7) }}
-          </td>
-          <td class="message-col">
-            {{ commit.message }}
-          </td>
-          <td class="stats-col">
-            <span v-if="commit.stats" class="commit-stats">
-              <span class="files">{{ commit.stats.files }} files</span>
-              <span v-if="commit.stats.additions" class="additions">+{{ commit.stats.additions }}</span>
-              <span v-if="commit.stats.deletions" class="deletions">-{{ commit.stats.deletions }}</span>
-            </span>
-          </td>
-          <td class="author">
-            {{ commit.authorName }}
-          </td>
-          <td class="date">
-            {{ commit.date }}
-          </td>
-        </tr>
-        <tr ref="loadingTriggerRef" class="loading-trigger">
-          <td colspan="5" class="loading-cell">
-            <div v-if="visibleCommits.length < graphData.length" class="loading-text">
-              Loading more commits...
-            </div>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    <ul class="commit-list">
+      <li class="commit-header">
+        <span class="hash-col">CommitId</span>
+        <span class="message-col">Message</span>
+        <span class="stats-col">Changes</span>
+        <span class="author">Author</span>
+        <span class="date">Date</span>
+      </li>
+      <li
+        v-for="commit in visibleCommits"
+        :key="commit.hash"
+        class="commit-row"
+        @click="handleCommitClick(commit)"
+        @dblclick="handleDoubleClick"
+      >
+        <span class="hash-col">{{ commit.hash.substring(0, 7) }}</span>
+        <span class="message-col">{{ commit.message }}</span>
+        <span class="stats-col">
+          <span v-if="commit.stats" class="commit-stats">
+            <span class="files">{{ commit.stats.files }} files</span>
+            <span v-if="commit.stats.additions" class="additions">+{{ commit.stats.additions }}</span>
+            <span v-if="commit.stats.deletions" class="deletions">-{{ commit.stats.deletions }}</span>
+          </span>
+        </span>
+        <span class="author">{{ commit.authorName }}</span>
+        <span class="date">{{ commit.date }}</span>
+      </li>
+      <li ref="loadingTriggerRef" class="loading-trigger">
+        <div v-if="visibleCommits.length < graphData.length" class="loading-text">
+          Loading more commits...
+        </div>
+      </li>
+    </ul>
   </div>
 </template>
 
@@ -161,64 +141,92 @@ onUnmounted(() => {
   font-family: var(--vscode-editor-font-family);
 }
 
-table {
+.commit-list {
   width: 100%;
-  border-collapse: collapse;
+  margin: 0;
+  padding: 0;
+  list-style: none;
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
 }
 
-th {
+.commit-header {
   position: sticky;
   top: 0;
-  z-index: 1;
-  text-align: left;
-  border-bottom: 1px solid var(--vscode-panel-border);
+  display: flex;
+  align-items: center;
+  padding: 8px;
   background-color: var(--vscode-sideBar-background);
-}
-
-td {
-  padding: 4px 8px;
   border-bottom: 1px solid var(--vscode-panel-border);
-  vertical-align: middle;
+  font-weight: bold;
 }
 
-.graph-col {
-  padding: 0;
+.commit-row {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  cursor: pointer;
+  gap: 5px;
+}
+
+.commit-row:hover {
+  background-color: var(--vscode-list-hoverBackground);
 }
 
 .hash-col {
   width: 80px;
-  padding: 4px 8px;
+  padding-right: 8px;
   white-space: nowrap;
-  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.commit-row .hash-col {
   color: var(--vscode-gitDecoration-addedResourceForeground);
 }
 
-td.hash-col:hover {
+.commit-row .hash-col:hover {
   text-decoration: underline;
 }
 
 .message-col {
-  min-width: 200px;
-  max-width: 400px;
-  text-overflow: ellipsis;
-  overflow: hidden;
+  flex: 1;
+  padding-right: 8px;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.author-col {
+.stats-col {
+  width: 140px;
+  padding-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.author {
   width: 120px;
+  padding-right: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.date-col {
-  width: 150px;
+.date {
+  width: 160px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--vscode-descriptionForeground);
 }
 
 .commit-stats {
-  display: flex;
+  display: inline-flex;
   gap: 8px;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .additions {
@@ -229,31 +237,18 @@ td.hash-col:hover {
   color: var(--vscode-gitDecoration-deletedResourceForeground);
 }
 
-.author {
-  white-space: nowrap;
-}
-
-.date {
-  white-space: nowrap;
-  color: var(--vscode-descriptionForeground);
-}
-
-tr:hover {
-  background-color: var(--vscode-list-hoverBackground);
-}
-
-.loading-cell {
+.loading-trigger {
   text-align: center;
   padding: 8px;
-  color: var(--vscode-descriptionForeground);
 }
 
 .loading-text {
   font-size: 12px;
+  color: var(--vscode-descriptionForeground);
 }
 
 /* Ensure the graph lines remain visible when hovering */
-tr:hover .commit-line {
+.commit-row:hover .commit-line {
   opacity: 0.8;
 }
 </style>
