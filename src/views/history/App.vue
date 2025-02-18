@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 
-import CommitTable from './components/CommitTable.vue'
+import CommitTable from './components/CommitTable/index.vue'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 

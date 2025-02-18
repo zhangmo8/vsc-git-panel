@@ -36,7 +36,6 @@ export class GitService {
     try {
       const logResult = await this.git.log([
         '--all',
-        '--max-count=100',
         '--decorate=full',
       ]) as ExtendedLogResult
 
