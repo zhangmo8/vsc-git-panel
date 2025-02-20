@@ -1,21 +1,20 @@
-import type { ExtensionContext } from 'vscode'
+import { useCommands } from 'reactive-vscode'
 
 import refreshCommand from './refresh'
 import diffCommand from './diff'
 
-import type { GitService } from '@/git'
 import type { DiffTreeView } from '@/views/diff'
 import type { GitPanelViewProvider } from '@/views/webview'
+import { EXTENSION_SYMBOL } from '@/constant'
 
 interface CommandProvider {
-  gitService: GitService
   diffProvider: DiffTreeView
   provider: GitPanelViewProvider
 }
 
-export function initCommands(context: ExtensionContext, { gitService, diffProvider, provider }: CommandProvider) {
-  context.subscriptions.push(
-    refreshCommand(provider),
-    diffCommand(gitService, diffProvider),
-  )
+export function initCommands({ diffProvider, provider }: CommandProvider) {
+  useCommands({
+    [`${EXTENSION_SYMBOL}.history.refresh`]: refreshCommand(provider),
+    [`${EXTENSION_SYMBOL}.openDiff`]: diffCommand(diffProvider),
+  })
 }

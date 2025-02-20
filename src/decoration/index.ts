@@ -1,12 +1,13 @@
 import type { ExtensionContext } from 'vscode'
 import { window } from 'vscode'
+import { extensionContext as context } from 'reactive-vscode'
 
 import { FileNodeDecorationProvider } from './FileNodeDecoration'
 
-export function initDecoration(context: ExtensionContext) {
+export function initDecoration() {
   const fileNodeDecorationProvider = new FileNodeDecorationProvider()
 
-  context.subscriptions.push(
+  context.value?.subscriptions.push(
     window.registerFileDecorationProvider(fileNodeDecorationProvider),
   )
 }

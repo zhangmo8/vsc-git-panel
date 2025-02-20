@@ -1,17 +1,22 @@
-import { Uri, commands, window, workspace } from 'vscode'
+import { Uri, window } from 'vscode'
+import { executeCommand, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { DiffTreeView } from '@/views/diff'
-import { GitService } from '@/git'
-import { EXTENSION_SYMBOL, GIT_STATUS } from '@/constant'
+import { useGitService } from '@/git'
+import { GIT_STATUS } from '@/constant'
+import { toGitUri } from '@/utils'
 
-export default function diffCommand(gitService: GitService, diffProvider: DiffTreeView) {
-  return commands.registerCommand(`${EXTENSION_SYMBOL}.openDiff`, async (fileInfo: { path: string, status: string }) => {
+export default function diffCommand(diffProvider: DiffTreeView) {
+  const { getPreviousCommit } = useGitService()
+  const workspaceFolders = useWorkspaceFolders()
+
+  return async (fileInfo: { path: string, status: string }) => {
     const commit = diffProvider.getSelectedCommitHash()
     if (!commit) {
       return
     }
 
-    const workspaceRoot = workspace.workspaceFolders?.[0]?.uri
+    const workspaceRoot = workspaceFolders.value?.[0]?.uri
     if (!workspaceRoot) {
       return
     }
@@ -22,11 +27,11 @@ export default function diffCommand(gitService: GitService, diffProvider: DiffTr
     // For modified files, show diff between current commit and its parent
     if (fileInfo.status === GIT_STATUS.MODIFIED) {
       try {
-        const previousCommit = await gitService.getPreviousCommit(commit)
+        const previousCommit = await getPreviousCommit(commit)
         if (previousCommit) {
-          const leftUri = GitService.toGitUri(uri, previousCommit)
-          const rightUri = GitService.toGitUri(uri, commit)
-          await commands.executeCommand('vscode.diff', leftUri, rightUri, title)
+          const leftUri = toGitUri(uri, previousCommit)
+          const rightUri = toGitUri(uri, commit)
+          await executeCommand('vscode.diff', leftUri, rightUri, title)
           return
         }
       }
@@ -38,8 +43,8 @@ export default function diffCommand(gitService: GitService, diffProvider: DiffTr
 
     // For added files, show the entire file content
     if (fileInfo.status === GIT_STATUS.ADDED) {
-      const gitUri = GitService.toGitUri(uri, commit)
-      await commands.executeCommand('vscode.open', gitUri)
+      const gitUri = toGitUri(uri, commit)
+      await executeCommand('vscode.open', gitUri)
     }
-  })
+  }
 }

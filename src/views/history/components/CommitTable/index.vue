@@ -18,7 +18,7 @@ const loadingTriggerRef = ref<HTMLElement | null>(null)
 
 const columnWidths = ref({
   hash: 80,
-  message: 400,
+  message: 200,
   stats: 140,
   author: 120,
   date: 160,

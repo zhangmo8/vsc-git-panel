@@ -1,34 +1,28 @@
-import type { ExtensionContext, Webview, WebviewView, WebviewViewProvider } from 'vscode'
-import { ExtensionMode, Uri, commands } from 'vscode'
+import type { Webview, WebviewView, WebviewViewProvider } from 'vscode'
+import { ExtensionMode, Uri } from 'vscode'
+import { extensionContext as context, executeCommand } from 'reactive-vscode'
 
 import { DiffTreeView } from './diff/DiffTreeView'
 
-import type { Commit, GitService } from '@/git'
-import { GitChangeMonitor } from '@/git/GitChangeMonitor'
-import { StorageService } from '@/storage'
+import { useGitService } from '@/git'
+import { useStorage } from '@/storage'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 
+import type { Commit } from '@/git'
+
 export class GitPanelViewProvider implements WebviewViewProvider {
-  private gitService: GitService
-  private storageService: StorageService
+  private git = useGitService()
+  private storage = useStorage()
   private gitChangesProvider: DiffTreeView
-  private _gitChangeMonitor: GitChangeMonitor
   public static readonly viewType = `${EXTENSION_SYMBOL}.history`
   private _commits: Commit[] = []
   private _view?: WebviewView
-  private _context: ExtensionContext
 
   constructor(
     private readonly _extensionUri: Uri,
-    gitService: GitService,
-    context: ExtensionContext,
   ) {
-    this.gitService = gitService
-    this.storageService = StorageService.getInstance()
     this.gitChangesProvider = DiffTreeView.getInstance()
-    this._context = context
-    this._gitChangeMonitor = new GitChangeMonitor(() => this.refreshHistory(true))
-    this._commits = this.storageService.getCommits()
+    this._commits = this.storage.getCommits()
   }
 
   public async refreshHistory(forceRefresh: boolean = false) {
@@ -37,7 +31,7 @@ export class GitPanelViewProvider implements WebviewViewProvider {
 
     try {
       if (this._commits.length === 0 || forceRefresh) {
-        const history = await this.gitService.getHistory()
+        const history = await this.git.getHistory()
 
         this._commits = history.all.map(commit => ({
           ...commit,
@@ -46,7 +40,7 @@ export class GitPanelViewProvider implements WebviewViewProvider {
           body: commit.body || '',
         }))
 
-        this.storageService.saveCommits(this._commits)
+        this.storage.saveCommits(this._commits)
       }
 
       this._view.webview.postMessage({
@@ -95,18 +89,18 @@ export class GitPanelViewProvider implements WebviewViewProvider {
           }
           break
         case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
-            await commands.executeCommand('git-panel.changes.focus')
+          await executeCommand('git-panel.changes.focus')
           break
 
         case 'clearHistory':
-          this.storageService.clearCommits()
+          this.storage.clearCommits()
           break
       }
     })
   }
 
   private _getHtmlForWebview(webview: Webview) {
-    const isDev = this._context.extensionMode === ExtensionMode.Development
+    const isDev = context.value?.extensionMode === ExtensionMode.Development
 
     const scriptUri = isDev
       ? 'http://localhost:5173/src/views/history/index.ts'

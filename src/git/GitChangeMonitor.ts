@@ -1,37 +1,19 @@
-import { type Disposable, type FileSystemWatcher, extensions, workspace } from 'vscode'
+import { type Disposable, extensions } from 'vscode'
+import { computed, createSingletonComposable, ref, useFsWatcher } from 'reactive-vscode'
 
-export class GitChangeMonitor {
-  private disposables: Disposable[] = []
-  private fileWatcher: FileSystemWatcher | undefined
-  private retryCount = 0
+export const useGitChangeMonitor = createSingletonComposable(() => {
+  const disposables = ref<Disposable[]>([])
+  const retryCount = ref(0)
+  let onGitChange = () => { }
 
-  constructor(private readonly onGitChange: () => void) {
-    this.initialize()
-    this.setupFileSystemWatcher()
-  }
+  const filesToWatch = computed(() => ['**/.git/index'])
+  const fsWatcher = useFsWatcher(filesToWatch)
 
-  private setupFileSystemWatcher() {
-    try {
-      this.fileWatcher = workspace.createFileSystemWatcher('**/.git/index')
+  fsWatcher.onDidChange(onGitChange)
+  fsWatcher.onDidCreate(onGitChange)
+  fsWatcher.onDidDelete(onGitChange)
 
-      this.disposables.push(
-        this.fileWatcher.onDidChange(() => {
-          this.onGitChange()
-        }),
-        this.fileWatcher.onDidCreate(() => {
-          this.onGitChange()
-        }),
-        this.fileWatcher.onDidDelete(() => {
-          this.onGitChange()
-        }),
-      )
-    }
-    catch (error) {
-      console.error('Error setting up file watcher:', error)
-    }
-  }
-
-  async getGitExtension() {
+  async function getGetInstance() {
     try {
       const extension = extensions.getExtension(
         'vscode.git',
@@ -54,49 +36,53 @@ export class GitChangeMonitor {
     return undefined
   }
 
-  private async initialize() {
+  function setupRepository(repo: any) {
     try {
-      const git = await this.getGitExtension()
-
-      if (!git && this.retryCount === 0) {
-        console.error('Failed to get Git extension API, will retry after 5 seconds...')
-        setTimeout(() => this.initialize(), 5000)
-        return
-      }
-
-      if (!git.repositories || git.repositories.length === 0) {
-        this.disposables.push(git.onDidOpenRepository((repo: any) => {
-          this.setupRepository(repo)
-        }))
-      }
-      else {
-        git.repositories.forEach((repo: any) => this.setupRepository(repo))
-      }
-    }
-    catch (error) {
-      console.error('Error in initialize:', error)
-      // 如果出错，5秒后重试
-      setTimeout(() => this.initialize(), 5000)
-    }
-  }
-
-  private setupRepository(repo: any) {
-    try {
-      this.disposables.push(repo.state.onDidChange(() => {
-        this.onGitChange()
-      }))
+      disposables.value.push(repo.state.onDidChange(onGitChange))
     }
     catch (error) {
       console.error('Error setting up repository:', error)
     }
   }
 
-  dispose() {
-    this.disposables.forEach(d => d.dispose())
-    this.disposables = []
-    if (this.fileWatcher) {
-      this.fileWatcher.dispose()
-      this.fileWatcher = undefined
+  function initializeError(fn: () => void) {
+    console.error('Failed to get Git extension API, will retry after 5 seconds...')
+    retryCount.value = 0
+    setTimeout(() => initialize(fn), 5000)
+  }
+
+  async function initialize(fn: () => void) {
+    try {
+      const git = await getGetInstance()
+
+      if (!git && retryCount.value === 0) {
+        initializeError(fn)
+        return
+      }
+
+      retryCount.value = 0
+      onGitChange = fn
+
+      if (!git.repositories || git.repositories.length === 0) {
+        disposables.value.push(git.onDidOpenRepository(setupRepository))
+      }
+      else {
+        git.repositories.forEach(setupRepository)
+      }
+    }
+    catch {
+      initializeError(fn)
     }
   }
-}
+
+  function dispose() {
+    retryCount.value = 0
+    disposables.value.forEach(d => d.dispose())
+    disposables.value = []
+  }
+
+  return {
+    dispose,
+    initialize,
+  }
+})

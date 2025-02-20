@@ -36,21 +36,19 @@ function handleDoubleClick() {
 </script>
 
 <template>
-  <li
-    class="commit-row" @click="handleCommitClick"
-    @dblclick="handleDoubleClick"
-  >
-    <span class="hash-col" :style="{ width: `${columnWidths.hash}px` }">{{ commit.hash.substring(0, 7) }}</span>
-    <span :style="{ width: `${columnWidths.message}px` }">{{ commit.message }}</span>
-    <span :style="{ width: `${columnWidths.stats}px` }">
+  <li class="commit-row" @click="handleCommitClick" @dblclick="handleDoubleClick">
+    <span class="hash-col commit-cell" :style="{ width: `${columnWidths.hash}px` }">{{ commit.hash.substring(0, 7)
+    }}</span>
+    <span class="commit-cell" :style="{ width: `${columnWidths.message}px` }">{{ commit.message }}</span>
+    <span class="commit-cell" :style="{ width: `${columnWidths.stats}px` }">
       <span v-if="commit.stats" class="commit-stats">
         <span class="files">{{ commit.stats.files }} files</span>
         <span v-if="commit.stats.additions" class="additions">+{{ commit.stats.additions }}</span>
         <span v-if="commit.stats.deletions" class="deletions">-{{ commit.stats.deletions }}</span>
       </span>
     </span>
-    <span :style="{ width: `${columnWidths.author}px` }">{{ commit.authorName }}</span>
-    <span class="date" :style="{ width: `${columnWidths.date}px` }">{{ commit.date }}</span>
+    <span class="commit-cell" :style="{ width: `${columnWidths.author}px` }">{{ commit.authorName }}</span>
+    <span class="commit-cell date" :style="{ width: `${columnWidths.date}px` }">{{ commit.date }}</span>
   </li>
 </template>
 
@@ -63,17 +61,16 @@ function handleDoubleClick() {
   width: 100%;
   box-sizing: border-box;
   padding: 8px;
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: flex;
-  align-items: center;
-
 }
 
 .commit-row:hover {
   background-color: var(--vscode-list-hoverBackground);
+}
+
+.commit-cell {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .hash-col {

@@ -1,17 +1,17 @@
+import { createSingletonComposable } from 'reactive-vscode'
 import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
-import type { CommitFile, GitService } from '@/git'
-import type { StorageService } from '@/storage'
+import { EXTENSION_SYMBOL } from '@/constant'
+import { type CommitFile, useGitService } from '@/git'
+import { useStorage } from '@/storage'
+import { parseGitStatus } from '@/utils'
 
 export class FileTreeView {
-  private gitService: GitService
-  private storageService: StorageService
+  private gitService = useGitService()
+  private storage = useStorage()
   private commitHash: string = ''
 
-  constructor(gitService: GitService, storageService: StorageService) {
-    this.gitService = gitService
-    this.storageService = storageService
-  }
+  constructor() {}
 
   refresh(commitHash: string): void {
     if (commitHash === this.commitHash) {
@@ -20,28 +20,14 @@ export class FileTreeView {
     this.commitHash = commitHash
   }
 
-  private parseGitStatus(status: string): { type: string, similarity?: number } {
-    // 处理重命名状态，例如 "R86" 表示重命名且相似度为 86%
-    const match = status.match(/^([A-Z])(\d+)?$/)
-    if (match) {
-      return {
-        type: match[1],
-        similarity: match[2] ? Number.parseInt(match[2], 10) : undefined,
-      }
-    }
-    return { type: status }
-  }
-
   private buildFileTree(files: CommitFile[]): Array<FileNode | FolderNode> {
     const root = new Map<string, FolderNode | FileNode>()
 
     for (const file of files) {
-      // 处理可能包含制表符的路径
       const normalizedPath = file.path.replace(/\t/g, '')
       const parts = normalizedPath.split('/')
       const directories = parts.slice(0, -1)
 
-      // 如果是根目录下的文件
       if (directories.length === 0) {
         root.set(normalizedPath, new FileNode(
           normalizedPath,
@@ -98,7 +84,7 @@ export class FileTreeView {
       return { files: [], total: 0 }
 
     try {
-      const commit = this.storageService.getCommit(this.commitHash)
+      const commit = this.storage.getCommit(this.commitHash)
 
       if (commit?.files) {
         return {
@@ -121,7 +107,7 @@ export class FileTreeView {
         .filter(line => line.length > 0)
         .map((line) => {
           const [status, ...pathParts] = line.split('\t')
-          const { type, similarity } = this.parseGitStatus(status)
+          const { type, similarity } = parseGitStatus(status)
 
           if (type === 'R' && pathParts.length === 2) {
             const [oldPath, newPath] = pathParts
@@ -139,7 +125,7 @@ export class FileTreeView {
           }
         })
 
-      this.storageService.updateCommitFiles(this.commitHash, fileChanges)
+      this.storage.updateCommitFiles(this.commitHash, fileChanges)
 
       return {
         files: this.buildFileTree(fileChanges),
@@ -152,3 +138,62 @@ export class FileTreeView {
     }
   }
 }
+
+// const useDiffTreeView = createSingletonComposable(() => {
+//   const selectedCommitHash = ref<string[]>([])
+
+//   const tree = useTreeView(
+//     `${EXTENSION_SYMBOL}.changes`,
+//     [],
+//     {
+//       canSelectMany: false,
+//     },
+//   )
+
+//   const refresh = (commitsHash: string[]) => {
+//     selectedCommitHash.value = commitsHash
+//     tree.refresh()
+//   }
+
+//   const getCommitByHash = async (hash?: string): Promise<CommitDetails | null> => {
+//     try {
+//       if (!hash) {
+//         throw new Error('Commit hash is required')
+//       }
+
+//       // First try to get from cache
+//       let commit = storageService.getCommit(hash)
+
+//       if (!commit) {
+//         // Only fetch all commits if not found in cache
+//         const history = await gitService.getHistory()
+//         const historyCommit = history.all.find(c => c.hash === hash)
+//         if (!historyCommit) {
+//           return null
+//         }
+
+//         commit = {
+//           hash: historyCommit.hash,
+//           authorName: historyCommit.author_name,
+//           authorEmail: historyCommit.author_email,
+//           date: historyCommit.date,
+//           message: historyCommit.message,
+//           body: historyCommit.body,
+//           stats: historyCommit.stats,
+//         }
+//       }
+
+//       return commit
+//     }
+//     catch (error) {
+//       console.error('Error getting commit details:', error)
+//       return null
+//     }
+//   }
+
+//   return {
+//     diffTreeView: tree,
+//     selectedCommitHash,
+//     refresh,
+//   }
+// })

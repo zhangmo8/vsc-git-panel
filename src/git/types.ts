@@ -1,4 +1,4 @@
-import type { ListLogLine, LogResult } from 'simple-git'
+import type { DefaultLogFields, ListLogLine, LogResult } from 'simple-git'
 
 export interface CommitFile {
   path: string
@@ -21,12 +21,17 @@ export interface Commit extends ListLogLine {
   files?: Array<CommitFile>
 }
 
+export interface CommitFields extends DefaultLogFields {
+  stats?: CommitStats
+  authorName: string
+  authorEmail: string
+}
+
 export interface CommitStats {
   files: number
   additions: number
   deletions: number
 }
 
-export interface ExtendedLogResult extends LogResult {
-  all: Array<LogResult['all'][0] & { stats?: CommitStats }>
+export interface ExtendedLogResult extends LogResult<CommitFields> {
 }
