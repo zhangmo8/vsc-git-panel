@@ -9,10 +9,10 @@ import { useDiffTreeView } from '@/views/diff'
 export default function diffCommand() {
   const { getPreviousCommit } = useGitService()
   const workspaceFolders = useWorkspaceFolders()
-  const diffProvider = useDiffTreeView()
+  const { selectedCommitHash } = useDiffTreeView()
 
   return async (fileInfo: { path: string, status: string }) => {
-    const commit = (await diffProvider).selectedCommitHash.value
+    const commit = selectedCommitHash.value
     if (!commit) {
       return
     }
