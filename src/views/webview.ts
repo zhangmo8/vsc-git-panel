@@ -32,13 +32,7 @@ export class GitPanelViewProvider implements WebviewViewProvider {
     try {
       if (this._commits.length === 0 || forceRefresh) {
         const history = await this.git.getHistory()
-
-        this._commits = history.all.map(commit => ({
-          ...commit,
-          authorName: commit.author_name,
-          authorEmail: commit.author_email,
-          body: commit.body || '',
-        }))
+        this._commits = Array.from(history.all)
 
         this.storage.saveCommits(this._commits)
       }

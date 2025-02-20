@@ -29,21 +29,9 @@ export const useGitService = createSingletonComposable(() => {
       ]) as ExtendedLogResult
 
       for (const commit of logResult.all) {
-        try {
-          const { diff, author_email, author_name } = commit
-          commit.authorEmail = author_email
-          commit.authorName = author_name
-
-          commit.stats = {
-            files: diff?.changed || 0,
-            additions: diff?.insertions || 0,
-            deletions: diff?.deletions || 0,
-          }
-        }
-        catch (error) {
-          logger.warn(`Failed to get stats for commit ${commit.hash}:`, error)
-          commit.stats = { files: 0, additions: 0, deletions: 0 }
-        }
+        const { author_email, author_name } = commit
+        commit.authorEmail = author_email
+        commit.authorName = author_name
       }
 
       return logResult

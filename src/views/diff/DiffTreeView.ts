@@ -56,13 +56,7 @@ export class DiffTreeView implements TreeDataProvider<CommitNode> {
         }
 
         commit = {
-          hash: historyCommit.hash,
-          authorName: historyCommit.author_name,
-          authorEmail: historyCommit.author_email,
-          date: historyCommit.date,
-          message: historyCommit.message,
-          body: historyCommit.body,
-          stats: historyCommit.stats,
+          ...historyCommit,
         }
       }
 

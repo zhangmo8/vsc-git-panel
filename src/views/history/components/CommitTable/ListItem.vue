@@ -41,10 +41,10 @@ function handleDoubleClick() {
     }}</span>
     <span class="commit-cell" :style="{ width: `${columnWidths.message}px` }">{{ commit.message }}</span>
     <span class="commit-cell" :style="{ width: `${columnWidths.stats}px` }">
-      <span v-if="commit.stats" class="commit-stats">
-        <span class="files">{{ commit.stats.files }} files</span>
-        <span v-if="commit.stats.additions" class="additions">+{{ commit.stats.additions }}</span>
-        <span v-if="commit.stats.deletions" class="deletions">-{{ commit.stats.deletions }}</span>
+      <span v-if="commit.diff" class="commit-stats">
+        <span class="files">{{ commit.diff.changed }} files</span>
+        <span v-if="commit.diff.insertions" class="additions">+{{ commit.diff.insertions }}</span>
+        <span v-if="commit.diff.deletions" class="deletions">-{{ commit.diff.deletions }}</span>
       </span>
     </span>
     <span class="commit-cell" :style="{ width: `${columnWidths.author}px` }">{{ commit.authorName }}</span>
