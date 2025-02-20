@@ -8,7 +8,7 @@ import {
   useWebviewView,
 } from 'reactive-vscode'
 
-import { DiffTreeView } from './diff/DiffTreeView'
+import { useDiffTreeView } from './diff/DiffTreeView'
 
 import { useGitService } from '@/git'
 import { useStorage } from '@/storage'
@@ -34,7 +34,7 @@ export const useGitPanelView = createSingletonComposable(() => {
     throw new Error('Extension context not initialized')
   }
 
-  const gitChangesProvider = DiffTreeView.getInstance()
+  const gitChangesProvider = useDiffTreeView()
   const commits = ref<Commit[]>(storage.getCommits())
 
   const isDev = context.value?.extensionMode === ExtensionMode.Development
@@ -97,7 +97,7 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
             try {
-              gitChangesProvider.refresh(message.commitHash)
+              (await gitChangesProvider).refresh(message.commitHash)
             }
             catch (error) {
               postMessage({

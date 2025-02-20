@@ -1,4 +1,5 @@
-import { createSingletonComposable } from 'reactive-vscode'
+import type { TreeViewNode } from 'reactive-vscode'
+import { createSingletonComposable, ref } from 'reactive-vscode'
 import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
 import { EXTENSION_SYMBOL } from '@/constant'
@@ -6,22 +7,13 @@ import { type CommitFile, useGitService } from '@/git'
 import { useStorage } from '@/storage'
 import { parseGitStatus } from '@/utils'
 
-export class FileTreeView {
-  private gitService = useGitService()
-  private storage = useStorage()
-  private commitHash: string = ''
+export const useFileTreeView = createSingletonComposable(() => {
+  const git = useGitService()
+  const storage = useStorage()
 
-  constructor() {}
-
-  refresh(commitHash: string): void {
-    if (commitHash === this.commitHash) {
-      return
-    }
-    this.commitHash = commitHash
-  }
-
-  private buildFileTree(files: CommitFile[]): Array<FileNode | FolderNode> {
-    const root = new Map<string, FolderNode | FileNode>()
+  function buildFileTree(files: CommitFile[]): TreeViewNode[] {
+    const root = new Map<string, TreeViewNode>()
+    const folderChildren = new Map<string, TreeViewNode[]>()
 
     for (const file of files) {
       const normalizedPath = file.path.replace(/\t/g, '')
@@ -29,16 +21,18 @@ export class FileTreeView {
       const directories = parts.slice(0, -1)
 
       if (directories.length === 0) {
-        root.set(normalizedPath, new FileNode(
-          normalizedPath,
-          file.status,
-          'oldPath' in file ? file.oldPath : undefined,
-        ))
+        root.set(normalizedPath, {
+          treeItem: new FileNode(
+            normalizedPath,
+            file.status,
+            'oldPath' in file ? file.oldPath : undefined,
+          ),
+        })
         continue
       }
 
       let currentPath = ''
-      let currentNode: FolderNode | undefined
+      let currentNode: TreeViewNode | undefined
       let parentMap = root
 
       for (let i = 0; i < directories.length; i++) {
@@ -50,61 +44,78 @@ export class FileTreeView {
 
         let node = parentMap.get(currentPath)
         if (!node) {
-          node = new FolderNode(dirName, currentPath)
+          const folderNode = new FolderNode(dirName, currentPath)
+          const children: TreeViewNode[] = []
+          folderChildren.set(currentPath, children)
+          
+          node = {
+            treeItem: folderNode,
+            children,
+          }
           parentMap.set(currentPath, node)
 
           if (currentNode) {
-            currentNode.addChild(node)
+            const parentChildren = folderChildren.get((currentNode.treeItem as FolderNode).path)
+            if (parentChildren)
+              parentChildren.push(node)
           }
         }
 
-        if (node instanceof FolderNode) {
-          currentNode = node
-          parentMap = new Map(
-            node.children.map(child => [child.path, child]),
-          )
-        }
+        currentNode = node
+        parentMap = new Map(
+          (folderChildren.get(currentPath) || []).map(child => [
+            (child.treeItem as FolderNode | FileNode).path,
+            child,
+          ]),
+        )
       }
 
       if (currentNode) {
-        const fileNode = new FileNode(
-          normalizedPath,
-          file.status,
-          'oldPath' in file ? file.oldPath : undefined,
-        )
-        currentNode.addChild(fileNode)
+        const fileNode: TreeViewNode = {
+          treeItem: new FileNode(
+            normalizedPath,
+            file.status,
+            'oldPath' in file ? file.oldPath : undefined,
+          ),
+        }
+        const currentChildren = folderChildren.get((currentNode.treeItem as FolderNode).path)
+        if (currentChildren)
+          currentChildren.push(fileNode)
       }
     }
 
     return Array.from(root.values())
   }
 
-  async getChildren(): Promise<{ files: Array<FileNode | FolderNode>, total: number }> {
-    if (!this.commitHash)
+  async function getChildren(commitHash: string): Promise<{ files: TreeViewNode[], total: number }> {
+    if (!commitHash)
       return { files: [], total: 0 }
 
     try {
-      const commit = this.storage.getCommit(this.commitHash)
+      const commit = storage.getCommit(commitHash)
 
       if (commit?.files) {
         return {
-          files: this.buildFileTree(commit.files),
+          files: buildFileTree(commit.files),
           total: commit.files.length,
         }
       }
 
-      const showResult = await this.gitService.git.show([
+      const showResult = await git.git.show([
         '--name-status',
         '--pretty=format:',
         '-M',
         '-C',
-        this.commitHash,
+        commitHash,
       ])
 
-      const fileChanges = showResult
+      if (!showResult)
+        return { files: [], total: 0 }
+
+      const files = showResult
         .trim()
         .split('\n')
-        .filter(line => line.length > 0)
+        .filter(Boolean)
         .map((line) => {
           const [status, ...pathParts] = line.split('\t')
           const { type, similarity } = parseGitStatus(status)
@@ -125,11 +136,9 @@ export class FileTreeView {
           }
         })
 
-      this.storage.updateCommitFiles(this.commitHash, fileChanges)
-
       return {
-        files: this.buildFileTree(fileChanges),
-        total: fileChanges.length,
+        files: buildFileTree(files),
+        total: files.length,
       }
     }
     catch (error) {
@@ -137,7 +146,16 @@ export class FileTreeView {
       return { files: [], total: 0 }
     }
   }
-}
+
+  const refresh = (commitHash: string) => {
+    getChildren(commitHash)
+  }
+
+  return {
+    getChildren,
+    refresh,
+  }
+})
 
 // const useDiffTreeView = createSingletonComposable(() => {
 //   const selectedCommitHash = ref<string[]>([])

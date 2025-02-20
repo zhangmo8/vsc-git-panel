@@ -1,17 +1,18 @@
 import { Uri, window } from 'vscode'
 import { executeCommand, useWorkspaceFolders } from 'reactive-vscode'
 
-import type { DiffTreeView } from '@/views/diff'
 import { useGitService } from '@/git'
 import { GIT_STATUS } from '@/constant'
 import { toGitUri } from '@/utils'
+import { useDiffTreeView } from '@/views/diff'
 
-export default function diffCommand(diffProvider: DiffTreeView) {
+export default function diffCommand() {
   const { getPreviousCommit } = useGitService()
   const workspaceFolders = useWorkspaceFolders()
+  const diffProvider = useDiffTreeView()
 
   return async (fileInfo: { path: string, status: string }) => {
-    const commit = diffProvider.getSelectedCommitHash()
+    const commit = (await diffProvider).selectedCommitHash.value
     if (!commit) {
       return
     }
