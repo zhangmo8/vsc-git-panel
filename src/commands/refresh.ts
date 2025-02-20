@@ -1,7 +1,5 @@
-import type { GitPanelViewProvider } from '@/views/webview'
+import { useGitPanelView } from '@/views/webview'
 
-export default function refreshCommand(provider: GitPanelViewProvider) {
-  return () => {
-    provider.refreshHistory(true)
-  }
+export default function refreshCommand() {
+  useGitPanelView().forceRefresh()
 }

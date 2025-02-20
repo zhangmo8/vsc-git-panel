@@ -1,6 +1,12 @@
-import type { Webview, WebviewView, WebviewViewProvider } from 'vscode'
 import { ExtensionMode, Uri } from 'vscode'
-import { extensionContext as context, executeCommand } from 'reactive-vscode'
+import {
+  computed,
+  extensionContext as context,
+  createSingletonComposable,
+  executeCommand,
+  ref,
+  useWebviewView,
+} from 'reactive-vscode'
 
 import { DiffTreeView } from './diff/DiffTreeView'
 
@@ -10,103 +16,36 @@ import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 
 import type { Commit } from '@/git'
 
-export class GitPanelViewProvider implements WebviewViewProvider {
-  private git = useGitService()
-  private storage = useStorage()
-  private gitChangesProvider: DiffTreeView
-  public static readonly viewType = `${EXTENSION_SYMBOL}.history`
-  private _commits: Commit[] = []
-  private _view?: WebviewView
+function getNonce() {
+  let text = ''
+  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
+  for (let i = 0; i < 32; i++)
+    text += possible.charAt(Math.floor(Math.random() * possible.length))
+  return text
+}
 
-  constructor(
-    private readonly _extensionUri: Uri,
-  ) {
-    this.gitChangesProvider = DiffTreeView.getInstance()
-    this._commits = this.storage.getCommits()
+export const useGitPanelView = createSingletonComposable(() => {
+  const git = useGitService()
+  const storage = useStorage()
+
+  const extensionUri = context.value?.extensionUri || Uri.file(context.value?.extensionPath || '')
+
+  if (!extensionUri) {
+    throw new Error('Extension context not initialized')
   }
 
-  public async refreshHistory(forceRefresh: boolean = false) {
-    if (!this._view)
-      return
+  const gitChangesProvider = DiffTreeView.getInstance()
+  const commits = ref<Commit[]>(storage.getCommits())
 
-    try {
-      if (this._commits.length === 0 || forceRefresh) {
-        const history = await this.git.getHistory()
-        this._commits = Array.from(history.all)
-
-        this.storage.saveCommits(this._commits)
-      }
-
-      this._view.webview.postMessage({
-        command: CHANNEL.HISTORY,
-        commits: this._commits,
-      })
-    }
-    catch (error) {
-      this._view.webview.postMessage({
-        command: 'Failed to get git history',
-        message: `${error}`,
-      })
-    }
-  }
-
-  public resolveWebviewView(
-    webviewView: WebviewView,
-  ) {
-    this._view = webviewView
-    webviewView.webview.options = {
-      enableScripts: true,
-      localResourceRoots: [
-        Uri.joinPath(this._extensionUri, '../'),
-        Uri.joinPath(this._extensionUri),
-      ],
-    }
-
-    webviewView.webview.html = this._getHtmlForWebview(webviewView.webview)
-
-    // Handle messages from webview
-    webviewView.webview.onDidReceiveMessage(async (message) => {
-      switch (message.command) {
-        case WEBVIEW_CHANNEL.GET_HISTORY:
-          await this.refreshHistory(message.forceRefresh)
-          break
-
-        case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
-          try {
-            this.gitChangesProvider.refresh(message.commitHash)
-          }
-          catch (error) {
-            webviewView.webview.postMessage({
-              command: 'Failed to show commit details',
-              message: `${error}`,
-            })
-          }
-          break
-        case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
-          await executeCommand('git-panel.changes.focus')
-          break
-
-        case 'clearHistory':
-          this.storage.clearCommits()
-          break
-      }
-    })
-  }
-
-  private _getHtmlForWebview(webview: Webview) {
-    const isDev = context.value?.extensionMode === ExtensionMode.Development
-
+  const isDev = context.value?.extensionMode === ExtensionMode.Development
+  const html = computed(() => {
     const scriptUri = isDev
       ? 'http://localhost:5173/src/views/history/index.ts'
-      : webview.asWebviewUri(
-        Uri.joinPath(this._extensionUri, 'views.es.js'),
-      )
+      : Uri.joinPath(extensionUri, 'views.es.js')
 
     const styleUri = isDev
       ? null
-      : webview.asWebviewUri(
-        Uri.joinPath(this._extensionUri, 'views.css'),
-      )
+      : Uri.joinPath(extensionUri, 'views.css')
 
     const nonce = getNonce()
 
@@ -135,13 +74,80 @@ export class GitPanelViewProvider implements WebviewViewProvider {
                 <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
               </body>
             </html>`
-  }
-}
+  })
 
-function getNonce() {
-  let text = ''
-  const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
-  for (let i = 0; i < 32; i++)
-    text += possible.charAt(Math.floor(Math.random() * possible.length))
-  return text
-}
+  const { forceRefresh: refreshWebview, postMessage } = useWebviewView(
+    `${EXTENSION_SYMBOL}.history`,
+    html,
+    {
+      retainContextWhenHidden: true,
+      webviewOptions: {
+        enableCommandUris: true,
+        enableScripts: true,
+        localResourceRoots: [
+          Uri.joinPath(extensionUri, '../'),
+          Uri.joinPath(extensionUri),
+        ],
+      },
+      onDidReceiveMessage: async (message) => {
+        switch (message.command) {
+          case WEBVIEW_CHANNEL.GET_HISTORY:
+            await refreshHistory(message.forceRefresh)
+            break
+
+          case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
+            try {
+              gitChangesProvider.refresh(message.commitHash)
+            }
+            catch (error) {
+              postMessage({
+                command: 'Failed to show commit details',
+                message: `${error}`,
+              })
+            }
+            break
+
+          case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
+            await executeCommand('git-panel.changes.focus')
+            break
+
+          case 'clearHistory':
+            storage.clearCommits()
+            break
+        }
+      },
+    },
+  )
+
+  async function refreshHistory(forceRefresh: boolean = false) {
+    try {
+      if (commits.value.length === 0 || forceRefresh) {
+        const history = await git.getHistory()
+        commits.value = Array.from(history.all)
+        storage.saveCommits(commits.value)
+      }
+
+      postMessage({
+        command: CHANNEL.HISTORY,
+        commits: commits.value,
+      })
+    }
+    catch (error) {
+      postMessage({
+        command: 'Failed to get git history',
+        message: `${error}`,
+      })
+    }
+  }
+
+  function forceRefresh() {
+    refreshHistory(true)
+    refreshWebview()
+  }
+
+  return {
+    viewType: `${EXTENSION_SYMBOL}.history` as const,
+    refreshHistory,
+    forceRefresh,
+  }
+})

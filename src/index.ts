@@ -1,22 +1,21 @@
-import { Uri, window } from 'vscode'
-import { defineExtension } from 'reactive-vscode'
+import { Disposable, window } from 'vscode'
+import { defineExtension, useDisposable } from 'reactive-vscode'
 
-import { GitPanelViewProvider } from './views/webview'
+import { useGitPanelView } from './views/webview'
 import { DiffTreeView } from './views/diff'
 import { logger } from './utils'
 import { initCommands } from './commands'
 import { EXTENSION_SYMBOL } from './constant'
 import { initDecoration } from './decoration'
 import { useStorage } from './storage'
+import { useGitChangeMonitor } from './git/GitChangeMonitor'
 
 const { activate, deactivate } = defineExtension(() => {
   logger.info('Git Panel Activated')
 
-  const storage = useStorage()
-  storage.clearCommits()
-
-  const provider = new GitPanelViewProvider(Uri.file(__dirname))
-  window.registerWebviewViewProvider(GitPanelViewProvider.viewType, provider)
+  useStorage().clearCommits()
+  useGitPanelView()
+  const gitChangeMonitor = useGitChangeMonitor()
 
   const diffProvider = DiffTreeView.getInstance()
   window.createTreeView(`${EXTENSION_SYMBOL}.changes`, {
@@ -25,7 +24,9 @@ const { activate, deactivate } = defineExtension(() => {
   })
 
   initDecoration()
-  initCommands({ diffProvider, provider })
+  initCommands({ diffProvider })
+
+  useDisposable(new Disposable(gitChangeMonitor.dispose))
 })
 
 export { activate, deactivate }

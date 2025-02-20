@@ -1,13 +1,18 @@
 import { type Disposable, extensions } from 'vscode'
-import { computed, createSingletonComposable, ref, useFsWatcher } from 'reactive-vscode'
+import { createSingletonComposable, ref, useFsWatcher } from 'reactive-vscode'
+import { useGitPanelView } from '@/views/webview'
 
 export const useGitChangeMonitor = createSingletonComposable(() => {
+  const webview = useGitPanelView()
+
   const disposables = ref<Disposable[]>([])
   const retryCount = ref(0)
-  let onGitChange = () => { }
 
-  const filesToWatch = computed(() => ['**/.git/index'])
-  const fsWatcher = useFsWatcher(filesToWatch)
+  const onGitChange = () => {
+    webview.refreshHistory(true)
+  }
+
+  const fsWatcher = useFsWatcher('**/.git/index')
 
   fsWatcher.onDidChange(onGitChange)
   fsWatcher.onDidCreate(onGitChange)
@@ -45,24 +50,24 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
     }
   }
 
-  function initializeError(fn: () => void) {
+  function initializeError() {
     console.error('Failed to get Git extension API, will retry after 5 seconds...')
-    retryCount.value = 0
-    setTimeout(() => initialize(fn), 5000)
+    if (retryCount.value === 0) {
+      retryCount.value++
+      setTimeout(initialize, 5000)
+    }
   }
 
-  async function initialize(fn: () => void) {
+  async function initialize() {
     try {
       const git = await getGetInstance()
 
-      if (!git && retryCount.value === 0) {
-        initializeError(fn)
+      if (!git) {
+        initializeError()
         return
       }
 
       retryCount.value = 0
-      onGitChange = fn
-
       if (!git.repositories || git.repositories.length === 0) {
         disposables.value.push(git.onDidOpenRepository(setupRepository))
       }
@@ -71,7 +76,7 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
       }
     }
     catch {
-      initializeError(fn)
+      initializeError()
     }
   }
 
@@ -81,8 +86,9 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
     disposables.value = []
   }
 
+  initialize()
+
   return {
     dispose,
-    initialize,
   }
 })
