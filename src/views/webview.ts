@@ -1,3 +1,4 @@
+import type { Webview } from 'vscode'
 import { ExtensionMode, Uri } from 'vscode'
 import {
   computed,
@@ -6,6 +7,7 @@ import {
   executeCommand,
   ref,
   useWebviewView,
+  watch,
 } from 'reactive-vscode'
 
 import { useDiffTreeView } from './diff/DiffTreeView'
@@ -28,7 +30,7 @@ export const useGitPanelView = createSingletonComposable(() => {
   const git = useGitService()
   const storage = useStorage()
 
-  const extensionUri = context.value?.extensionUri || Uri.file(context.value?.extensionPath || '')
+  const extensionUri = Uri.file(__dirname)
 
   if (!extensionUri) {
     throw new Error('Extension context not initialized')
@@ -38,14 +40,18 @@ export const useGitPanelView = createSingletonComposable(() => {
   const commits = ref<Commit[]>(storage.getCommits())
 
   const isDev = context.value?.extensionMode === ExtensionMode.Development
-  const html = computed(() => {
+
+  function getHtml(webview: Webview | undefined) {
+    if (!webview)
+      return ''
+
     const scriptUri = isDev
       ? 'http://localhost:5173/src/views/history/index.ts'
-      : Uri.joinPath(extensionUri, 'views.es.js')
+      : webview.asWebviewUri(Uri.joinPath(extensionUri, 'views.es.js'))
 
     const styleUri = isDev
       ? null
-      : Uri.joinPath(extensionUri, 'views.css')
+      : webview.asWebviewUri(Uri.joinPath(extensionUri, 'views.css'))
 
     const nonce = getNonce()
 
@@ -74,16 +80,16 @@ export const useGitPanelView = createSingletonComposable(() => {
                 <script type="module" nonce="${nonce}" src="${scriptUri}"></script>
               </body>
             </html>`
-  })
+  }
 
-  const { forceRefresh: refreshWebview, postMessage } = useWebviewView(
+  const { forceRefresh: refreshWebview, view, postMessage } = useWebviewView(
     `${EXTENSION_SYMBOL}.history`,
-    html,
+    computed(() => getHtml(view.value?.webview)),
     {
       retainContextWhenHidden: true,
       webviewOptions: {
-        enableCommandUris: true,
         enableScripts: true,
+        enableCommandUris: true,
         localResourceRoots: [
           Uri.joinPath(extensionUri, '../'),
           Uri.joinPath(extensionUri),
