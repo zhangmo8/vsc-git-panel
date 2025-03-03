@@ -82,7 +82,7 @@ export const useGitPanelView = createSingletonComposable(() => {
             </html>`
   }
 
-  const { forceRefresh: refreshWebview, view, postMessage } = useWebviewView(
+  const { forceRefresh, view, postMessage } = useWebviewView(
     `${EXTENSION_SYMBOL}.history`,
     computed(() => getHtml(view.value?.webview)),
     {
@@ -117,7 +117,7 @@ export const useGitPanelView = createSingletonComposable(() => {
             await executeCommand('git-panel.changes.focus')
             break
 
-          case 'clearHistory':
+          case WEBVIEW_CHANNEL.CLEAR_HISTORY:
             storage.clearCommits()
             break
         }
@@ -128,8 +128,8 @@ export const useGitPanelView = createSingletonComposable(() => {
   async function refreshHistory(forceRefresh: boolean = false) {
     try {
       if (commits.value.length === 0 || forceRefresh) {
-        const history = await git.getHistory()
-        commits.value = Array.from(history.all)
+        const { logResult } = await git.getHistory()
+        commits.value = Array.from(logResult.all)
         storage.saveCommits(commits.value)
       }
 
@@ -144,11 +144,6 @@ export const useGitPanelView = createSingletonComposable(() => {
         message: `${error}`,
       })
     }
-  }
-
-  function forceRefresh() {
-    refreshHistory(true)
-    refreshWebview()
   }
 
   return {

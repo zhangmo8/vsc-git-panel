@@ -97,7 +97,8 @@
     <div id="branchSvg" style="position:relative;width: 500px;height: 500px;">
       <svg style="position: absolute;" width="100%" height="100%" viewBox="0 0 500 500">
         <text x="10" y="10" class="branch-label main-label" style="z-index: 3;" font-size="10" fill="blue">Main</text>
-        <text x="30" y="40" class="branch-label develop-label" style="z-index: 3;" font-size="10" fill="yellow">Develop</text>
+        <text x="30" y="40" class="branch-label develop-label" style="z-index: 3;" font-size="10"
+          fill="yellow">Develop</text>
         <path d="M 10 0 V 1800" stroke="blue" stroke-width="2" fill="none" />
         <path d="M 10 40 H 30 Q 40 40 40 50 V 210 Q 40 220 30 220 H 10" stroke="yellow" stroke-width="2" fill="none" />
       </svg>
@@ -117,120 +118,1097 @@
     </div>
   </div>
   <script>
-    const gitCommits = [
-      "commit",
-      "commit",
-      "branch develop",
-      "checkout develop",
-      "commit",
-      "commit",
-      "checkout main",
-      "commit",
-      "commit",
-      "checkout develop",
-      "commit",
-      "commit",
-      "commit",
-      "checkout main",
-      "merge develop",
-      "commit",
-      "commit",
-      "commit",
-    ];
+    const commits = [
+      {
+        "hash": "9daa77ca1100ea3861b1dcb7d5ba2f8f67a4327a",
+        "date": "2025-02-19T14:49:10+08:00",
+        "message": "Merge branch 'release' into 'master'",
+        "refs": "origin/master",
+        "body": "Release\n\nSee merge request pdcn/dpp/myporsche/panda/panda-porsche-web!2",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "b40d89ae6423d94d47579b25f00dfcbe540d7925",
+        "date": "2025-02-19T14:49:10+08:00",
+        "message": "Release",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 12,
+          "deletions": 2137,
+          "insertions": 3623,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 29,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "package.json",
+              "changes": 1,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "pnpm-lock.yaml",
+              "changes": 5636,
+              "insertions": 14,
+              "deletions": 8,
+              "binary": false
+            },
+            {
+              "file": "src/App.tsx",
+              "changes": 1,
+              "insertions": 0,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 2,
+              "insertions": 1,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/hooks/useTheme.ts",
+              "changes": 25,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/pages/my-benefits/benefits-detail/index.tsx",
+              "changes": 9,
+              "insertions": 1,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/pages/my-benefits/benefits-preview/index.tsx",
+              "changes": 14,
+              "insertions": 1,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/pages/my-benefits/index.tsx",
+              "changes": 7,
+              "insertions": 1,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/pages/service-inclusive/index.tsx",
+              "changes": 10,
+              "insertions": 1,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/utils/isHarmony.ts",
+              "changes": 4,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 22,
+              "insertions": 1,
+              "deletions": 1,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "2ac8617e805d5e582ec5fff8bc14b4f740e18bff",
+        "date": "2025-02-19T14:46:48+08:00",
+        "message": "Merge branch 'develop' into release",
+        "refs": "HEAD -> release, origin/release",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "9b45deac69ae3a0cffd6d4c7b5c980cee635e8a2",
+        "date": "2025-02-19T14:46:32+08:00",
+        "message": "Merge branch 'develop' into staging",
+        "refs": "origin/staging, staging",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "8d555495bbd58d3b50356bf17b8f8c93f2d6ce7e",
+        "date": "2025-02-17T17:45:52+08:00",
+        "message": "fix(PANDA-747): revert blink code",
+        "refs": "origin/develop, origin/HEAD, develop",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 0,
+          "insertions": 18,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 18,
+              "insertions": 18,
+              "deletions": 0,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "deeab17349f6b3e92e89ba0c197432243ce12cfd",
+        "date": "2025-02-17T17:41:57+08:00",
+        "message": "fix(PANDA-747): revert blink code",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 0,
+          "insertions": 29,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 29,
+              "insertions": 29,
+              "deletions": 0,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "084e5ecbeb20d508f1f9191c443122ab75984939",
+        "date": "2025-02-17T17:37:49+08:00",
+        "message": "fix(PANDA-747): remove unuse code",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 51,
+          "insertions": 0,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 51,
+              "insertions": 0,
+              "deletions": 51,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "951b6c1f1e43cb4b9a2d189ba3da74c2268f5832",
+        "date": "2025-02-17T17:13:20+08:00",
+        "message": "fix(PANDA-747): fix color mode",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 4,
+          "deletions": 15,
+          "insertions": 26,
+          "files": [
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 1,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/hooks/useTheme.ts",
+              "changes": 30,
+              "insertions": 20,
+              "deletions": 10,
+              "binary": false
+            },
+            {
+              "file": "src/utils/isHarmony.ts",
+              "changes": 4,
+              "insertions": 4,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 6,
+              "insertions": 1,
+              "deletions": 5,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "87a7ef35ea84f8858bc728190131ad8586f5b295",
+        "date": "2025-02-17T16:54:54+08:00",
+        "message": "fix(PANDA-747): fix color mode",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 5,
+          "deletions": 19,
+          "insertions": 36,
+          "files": [
+            {
+              "file": "src/hooks/useTheme.ts",
+              "changes": 15,
+              "insertions": 15,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/pages/my-benefits/benefits-detail/index.tsx",
+              "changes": 9,
+              "insertions": 5,
+              "deletions": 4,
+              "binary": false
+            },
+            {
+              "file": "src/pages/my-benefits/benefits-preview/index.tsx",
+              "changes": 14,
+              "insertions": 7,
+              "deletions": 7,
+              "binary": false
+            },
+            {
+              "file": "src/pages/my-benefits/index.tsx",
+              "changes": 7,
+              "insertions": 3,
+              "deletions": 4,
+              "binary": false
+            },
+            {
+              "file": "src/pages/service-inclusive/index.tsx",
+              "changes": 10,
+              "insertions": 6,
+              "deletions": 4,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "4714c845fcac5f8edaaa9e9e5b75a685e30bdd72",
+        "date": "2025-02-17T16:30:34+08:00",
+        "message": "fix(PANDA-747): fix color mode",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 2,
+          "insertions": 2,
+          "files": [
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 4,
+              "insertions": 2,
+              "deletions": 2,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "43ef05bfa9aee98b6a1eb47f81361e024d981565",
+        "date": "2025-02-17T16:26:35+08:00",
+        "message": "fix(PANDA-747): revert polyfill",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 0,
+          "insertions": 4,
+          "files": [
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 4,
+              "insertions": 4,
+              "deletions": 0,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "070d4f5a8986347de412e9ea9e48367678033dfc",
+        "date": "2025-02-17T16:20:23+08:00",
+        "message": "fix(PANDA-747): revert polyfill",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 2,
+          "deletions": 3,
+          "insertions": 0,
+          "files": [
+            {
+              "file": "package.json",
+              "changes": 1,
+              "insertions": 0,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "vite.config.ts",
+              "changes": 2,
+              "insertions": 0,
+              "deletions": 2,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "7b428e1468d3df8cdc7823b5198f2fd624efe883",
+        "date": "2025-02-17T16:19:52+08:00",
+        "message": "fix(PANDA-747): polyfill fixed",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 2,
+          "deletions": 5,
+          "insertions": 16,
+          "files": [
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 4,
+              "insertions": 0,
+              "deletions": 4,
+              "binary": false
+            },
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 17,
+              "insertions": 16,
+              "deletions": 1,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "76fa8faa97ff37030a585e56a515a51193371ae5",
+        "date": "2025-02-17T15:47:16+08:00",
+        "message": "fix(PANDA-747): polyfill fixed",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 0,
+          "insertions": 3,
+          "files": [
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 3,
+              "insertions": 3,
+              "deletions": 0,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "5ed83e11e6123aeda91f3207136784ce3b93c68e",
+        "date": "2025-02-17T15:43:41+08:00",
+        "message": "fix(PANDA-747): polyfill",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 5,
+          "deletions": 2118,
+          "insertions": 3527,
+          "files": [
+            {
+              "file": "package.json",
+              "changes": 2,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "pnpm-lock.yaml",
+              "changes": 5636,
+              "insertions": 25,
+              "deletions": 15,
+              "binary": false
+            },
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 4,
+              "insertions": 0,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 1,
+              "insertions": 0,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "vite.config.ts",
+              "changes": 2,
+              "insertions": 1,
+              "deletions": 0,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "2eefaadc594686e80429e571ca7e3e73cb1e7796",
+        "date": "2025-02-17T15:35:11+08:00",
+        "message": "fix(PANDA-747): fix by chakra color mode",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 4,
+          "deletions": 30,
+          "insertions": 31,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 52,
+              "insertions": 21,
+              "deletions": 21,
+              "binary": false
+            },
+            {
+              "file": "src/App.tsx",
+              "changes": 1,
+              "insertions": 0,
+              "deletions": 1,
+              "binary": false
+            },
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 4,
+              "insertions": 4,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 4,
+              "insertions": 1,
+              "deletions": 3,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "429e90343538dbb9c227d59ea8ee7a4edb1a0cba",
+        "date": "2025-02-17T14:56:02+08:00",
+        "message": "feat(PANDA-747): debugger",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 26,
+          "insertions": 26,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 52,
+              "insertions": 26,
+              "deletions": 26,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "827adceff50f4f169853eb372558354d8dcce0bc",
+        "date": "2025-02-17T14:44:31+08:00",
+        "message": "feat(PANDA-747): debugger",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 3,
+          "deletions": 8,
+          "insertions": 10,
+          "files": [
+            {
+              "file": "index.html",
+              "changes": 4,
+              "insertions": 4,
+              "deletions": 0,
+              "binary": false
+            },
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 6,
+              "insertions": 0,
+              "deletions": 6,
+              "binary": false
+            },
+            {
+              "file": "src/utils/theme.ts",
+              "changes": 8,
+              "insertions": 6,
+              "deletions": 2,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "fe6c01bca4c44e093121702e9dadacd94ff2266f",
+        "date": "2025-02-17T14:29:59+08:00",
+        "message": "feat(PANDA-747): dark fix",
+        "refs": "",
+        "body": "",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "diff": {
+          "changed": 1,
+          "deletions": 0,
+          "insertions": 6,
+          "files": [
+            {
+              "file": "src/hooks/useNativeNoticeH5.ts",
+              "changes": 6,
+              "insertions": 6,
+              "deletions": 0,
+              "binary": false
+            }
+          ]
+        },
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      },
+      {
+        "hash": "1eec42c6be1ed3c9deeb7db0812bd0d09a060a97",
+        "date": "2025-01-22T10:16:18+08:00",
+        "message": "Merge branch 'release' into 'master'",
+        "refs": "",
+        "body": "Release\n\nSee merge request pdcn/dpp/myporsche/panda/panda-porsche-web!1",
+        "author_name": "jiahengz",
+        "author_email": "jiahengz@wicresoft.com",
+        "authorEmail": "jiahengz@wicresoft.com",
+        "authorName": "jiahengz"
+      }
+    ]
 
-    function createBranchSvg() {
-      const height = gitCommits.length * 30;
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("class", "branch-svg");
-      svg.setAttribute("width", "300");
-      svg.setAttribute("height", height.toString());
+    /**
+     * 解析 Git 提交并添加父子关系
+     * @param {Array} commits - Git 提交数组
+     * @returns {Array} 带有父子关系的提交数组
+     */
+    function parseGitCommits(commits) {
+      const hashToIndex = {};
 
-      // 主分支线
-      const mainLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      mainLine.setAttribute("class", "branch-line main-branch");
-      mainLine.setAttribute("d", `M50,15 L50,${height}`);
-      svg.appendChild(mainLine);
+      const hasParents = commits.some(commit => commit.parents && commit.parents.length > 0);
 
-      // 开发分支线和合并线
-      const developStartY = 75;
-      const developEndY = height - 120;
+      const processedCommits = commits.map((commit, index) => {
+        const processedCommit = {
+          parents: [],
+          children: [],
+          ...commit,
+        };
 
-      // 分支线 - 使用简单圆角
-      const developLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      developLine.setAttribute("class", "branch-line develop-branch");
-      developLine.setAttribute("d", `M50,${developStartY} Q100,${developStartY} 150,${developStartY + 30} L150,${developEndY}`);
-      svg.appendChild(developLine);
+        processedCommit.parents = Array.isArray(commit.parents) ? [...commit.parents] : [];
 
-      // 合并线 - 使用简单圆角
-      const mergeLine = document.createElementNS("http://www.w3.org/2000/svg", "path");
-      mergeLine.setAttribute("class", "branch-line develop-branch");
-      mergeLine.setAttribute("d", `M150,${developEndY} Q100,${developEndY + 30} 50,${developEndY + 30}`);
-      svg.appendChild(mergeLine);
-
-      return svg;
-    }
-
-    function createCommitNode(x, isDevelop = false) {
-      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-      svg.setAttribute("width", "300");
-      svg.setAttribute("height", "30");
-
-      const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
-      circle.setAttribute("cx", x.toString());
-      circle.setAttribute("cy", "15");
-      circle.setAttribute("r", "6");
-      circle.setAttribute("class", isDevelop ? "commit-node-develop" : "commit-node");
-
-      svg.appendChild(circle);
-      return svg;
-    }
-
-    function createGitGraph() {
-      const table = document.getElementById('gitTable');
-      const branchSvg = createBranchSvg();
-      document.getElementById('app').insertBefore(branchSvg, table);
-
-      let skipNext = false;
-
-      gitCommits.forEach((commit, index) => {
-        // 跳过分支切换的命令行
-        if (skipNext) {
-          skipNext = false;
-          return;
+        // 尝试从diff中推断是否为合并提交
+        if (!hasParents && commit.diff && typeof commit.diff === 'object') {
+          if (commit.message && commit.message.toLowerCase().includes('merge')) {
+            processedCommit.isMergeCommit = true;
+          }
         }
 
-        if (commit.includes('branch') || commit.includes('checkout')) {
-          skipNext = true;
-          return;
-        }
+        hashToIndex[commit.hash] = index;
+        return processedCommit
+      });
 
-        const row = document.createElement('tr');
-        const cell = document.createElement('td');
-        const container = document.createElement('div');
-        container.className = 'git-cell';
+      if (!hasParents) {
+        const sortedByTime = [...processedCommits].sort((a, b) => new Date(a.date) - new Date(b.date));
 
-        if (commit === "commit") {
-          // 确定当前提交属于哪个分支
-          let isDevelop = false;
-          for (let i = 0; i <= index; i++) {
-            if (gitCommits[i].includes('checkout')) {
-              isDevelop = gitCommits[i].split(' ')[1] === 'develop';
+        // 使用一个Map来跟踪每个分支的最新提交
+        const branchHeads = new Map();
+        let defaultBranch = 'master';
+
+        // 根据提交消息尝试推断分支
+        sortedByTime.forEach(commit => {
+          let branch = 'master'; // 默认分支
+
+          // 从refs字段提取分支信息
+          if (commit.refs) {
+            const refsList = commit.refs.split(', ');
+            const branchRef = refsList.find(ref =>
+              !ref.includes('HEAD') &&
+              (ref.includes('->') ? true : true)
+            );
+
+            if (branchRef) {
+              branch = branchRef.includes('->') ?
+                branchRef.split('->')[1].trim() :
+                branchRef.trim();
             }
           }
 
-          // 根据是否在develop分支上调整x坐标
-          const x = isDevelop ? 150 : 50;
-          const commitNode = createCommitNode(x, isDevelop);
-          container.appendChild(commitNode);
-        }
+          // 尝试从消息中推断分支
+          if (commit.message) {
+            const msg = commit.message.toLowerCase();
+            // 检查合并消息格式
+            const mergeMatch = msg.match(/merge (?:branch |remote-tracking branch |)(\'|\")?([\w\/\.\-]+)(\'|\")?/i);
+            if (mergeMatch) {
+              const sourceBranch = mergeMatch[2];
+              commit.isMergeCommit = true;
 
-        cell.appendChild(container);
-        row.appendChild(cell);
-        table.appendChild(row);
+              // 找到源分支的最近提交
+              if (branchHeads.has(sourceBranch)) {
+                const sourceHead = branchHeads.get(sourceBranch);
+                if (!commit.parents.includes(sourceHead.hash)) {
+                  commit.parents.push(sourceHead.hash);
+
+                  // 将当前提交添加为源头提交的子提交
+                  const sourceIndex = hashToIndex[sourceHead.hash];
+                  if (sourceIndex !== undefined && !processedCommits[sourceIndex].children.includes(commit.hash)) {
+                    processedCommits[sourceIndex].children.push(commit.hash);
+                  }
+                }
+              }
+            }
+
+            // 检查其他分支相关指示器
+            if (msg.includes('checkout')) {
+              const checkoutMatch = msg.match(/checkout[\s:]+(\w+)/);
+              if (checkoutMatch) {
+                branch = checkoutMatch[1];
+              }
+            } else if (msg.includes('branch')) {
+              const branchMatch = msg.match(/branch[\s:]+(\w+)/);
+              if (branchMatch) {
+                branch = branchMatch[1];
+              }
+            }
+          }
+
+          // 为当前提交设置父提交（如果当前分支有最新提交）
+          if (branchHeads.has(branch) && !commit.isMergeCommit) {
+            const parentCommit = branchHeads.get(branch);
+            if (!commit.parents.includes(parentCommit.hash)) {
+              commit.parents.push(parentCommit.hash);
+
+              // 将当前提交添加为父提交的子提交
+              const parentIndex = hashToIndex[parentCommit.hash];
+              if (parentIndex !== undefined && !processedCommits[parentIndex].children.includes(commit.hash)) {
+                processedCommits[parentIndex].children.push(commit.hash);
+              }
+            }
+          }
+
+          // 更新分支头部
+          branchHeads.set(branch, commit);
+        });
+      }
+      else {
+        processedCommits.forEach((commit, index) => {
+          const parentHashes = commit.parents || [];
+
+          parentHashes.forEach(parentHash => {
+            if (hashToIndex[parentHash] !== undefined) {
+              const parentIndex = hashToIndex[parentHash];
+
+              if (!processedCommits[parentIndex].children.includes(commit.hash)) {
+                processedCommits[parentIndex].children.push(commit.hash);
+              }
+            }
+          });
+        });
+      }
+
+      // 再次扫描，确保所有合并提交都被正确标记
+      processedCommits.forEach(commit => {
+        // 如果有多个父提交，这是一个合并提交
+        if (commit.parents && commit.parents.length > 1) {
+          commit.isMergeCommit = true;
+        }
+        // 如果消息中包含merge关键词
+        else if (commit.message &&
+          commit.message.toLowerCase().match(/\b(merge|merged|merging)\b/i)) {
+          commit.isMergeCommit = true;
+        }
+        // 如果消息中提到了分支相关操作
+        else if (commit.message &&
+          (commit.message.toLowerCase().includes('branch') ||
+            commit.message.toLowerCase().includes('pull request') ||
+            commit.message.toLowerCase().includes('pr #'))) {
+          // 可能是与分支相关的操作，检查是否可能是合并提交
+          if (commit.message.toLowerCase().match(/\b(feat|feature|fix)\b.*?:/i)) {
+            // 特性或修复提交，可能是合并的结果
+            if (commit.diff && commit.diff.files && commit.diff.files.length > 2) {
+              // 如果修改了多个文件，更有可能是合并提交
+              commit.isMergeCommit = true;
+            }
+          }
+        }
       });
+
+      return processedCommits;
     }
 
-    // createGitGraph();
+    /**
+     * 生成简化的Git操作数组，用于后续SVG绘制
+     * @param {Array} commits - 带有父子关系的提交数组
+     * @returns {Object} 包含操作数组和分支列表的对象
+     */
+    function generateCommitGraph(commits) {
+      const hashToCommit = {};
+      commits.forEach(commit => {
+        hashToCommit[commit.hash] = commit;
+      });
+
+      const sortedCommits = [...commits].sort((a, b) => new Date(b.date) - new Date(a.date));
+
+      const branchMap = {};
+
+      commits.forEach(commit => {
+        if (commit.refs && commit.refs.trim() !== '') {
+          const refsList = commit.refs.split(', ');
+          refsList.forEach(ref => {
+            const branchName = ref.includes('->') ? ref.split('->')[1].trim() : ref;
+            const cleanBranchName = branchName.replace(/^(origin|upstream)\//, '');
+            if (!cleanBranchName.includes('HEAD')) {
+              branchMap[commit.hash] = cleanBranchName;
+            }
+          });
+        }
+      });
+
+      const branchesSet = new Set();
+      Object.values(branchMap).forEach(branch => branchesSet.add(branch));
+      const branchList = Array.from(branchesSet);
+
+      for (const commit of commits) {
+        if (branchMap[commit.hash]) continue;
+
+        if (commit.parents && commit.parents.length > 0) {
+          for (const parentHash of commit.parents) {
+            if (branchMap[parentHash]) {
+              branchMap[commit.hash] = branchMap[parentHash];
+              hasChanges = true;
+              break;
+            }
+          }
+        }
+
+        // 如果还没有分支，从子提交推断
+        if (!branchMap[commit.hash] && commit.children && commit.children.length > 0) {
+          // 如果只有一个子提交，采用它的分支
+          if (commit.children.length === 1 && branchMap[commit.children[0]]) {
+            branchMap[commit.hash] = branchMap[commit.children[0]];
+            hasChanges = true;
+          }
+          // 如果有多个子提交，选择非merge commit的分支
+          else {
+            for (const childHash of commit.children) {
+              const childCommit = hashToCommit[childHash];
+              if (childCommit && branchMap[childHash] && (!childCommit.parents || childCommit.parents.length <= 1)) {
+                branchMap[commit.hash] = branchMap[childHash];
+                hasChanges = true;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      // 检查提交消息以确定是否为合并提交或分支切换
+      commits.forEach(commit => {
+        if (commit.message) {
+          const msg = commit.message.toLowerCase();
+
+          // 检查合并消息
+          if (msg.match(/\b(merge|merged|merging)\b/i) && !commit.isMergeCommit) {
+            commit.isMergeCommit = true;
+
+            // 尝试从消息中提取源分支和目标分支
+            const mergeMatch = msg.match(/merge (?:branch |remote-tracking branch |)(\'|\")?([\w\/\.\-]+)(\'|\")?.*?(into|to) (\'|\")?([\w\/\.\-]+)(\'|\")?/i);
+            if (mergeMatch) {
+              const sourceBranch = mergeMatch[2].replace(/^(origin|upstream)\//, ''); // 移除远程前缀
+              const targetBranch = mergeMatch[6] ? mergeMatch[6].replace(/^(origin|upstream)\//, '') : branchMap[commit.hash];
+
+              // 更新分支映射
+              if (targetBranch && !branchMap[commit.hash]) {
+                branchMap[commit.hash] = targetBranch;
+                if (!branchesSet.has(targetBranch)) {
+                  branchesSet.add(targetBranch);
+                  branchList.push(targetBranch);
+                }
+              }
+
+              if (sourceBranch && !branchesSet.has(sourceBranch)) {
+                branchesSet.add(sourceBranch);
+                branchList.push(sourceBranch);
+              }
+            } else {
+              // 尝试只提取"from"分支
+              const fromMatch = msg.match(/\b(from|of)\b\s+(\'|\")?([\w\/\.\-]+)(\'|\")?/i);
+              if (fromMatch) {
+                const sourceBranch = fromMatch[3].replace(/^(origin|upstream)\//, '');
+                if (sourceBranch && !branchesSet.has(sourceBranch)) {
+                  branchesSet.add(sourceBranch);
+                  branchList.push(sourceBranch);
+                }
+              }
+            }
+          }
+
+          // 从提交消息判断分支信息
+          if (!branchMap[commit.hash]) {
+            // 检查是否是分支相关提交消息
+            const branchMatch = msg.match(/\b(branch|feature|fix)\b[:\s]+[\'\"]([\w\/\.\-]+)[\'\"]/i);
+            if (branchMatch) {
+              const inferredBranch = branchMatch[2].replace(/^(origin|upstream)\//, '');
+              branchMap[commit.hash] = inferredBranch;
+              if (!branchesSet.has(inferredBranch)) {
+                branchesSet.add(inferredBranch);
+                branchList.push(inferredBranch);
+              }
+            }
+          }
+        }
+      });
+
+      // 从commit message中提取JIRA ticket格式，用于分支匹配
+      const ticketToBranch = {};
+      commits.forEach(commit => {
+        if (commit.message) {
+          // 尝试匹配JIRA ticket格式如PANDA-747
+          const ticketMatch = commit.message.match(/\b([A-Z]+-\d+)\b/);
+          if (ticketMatch && branchMap[commit.hash]) {
+            ticketToBranch[ticketMatch[1]] = branchMap[commit.hash];
+          }
+        }
+      });
+
+      // 为没有分支的提交基于ticket分配分支
+      commits.forEach(commit => {
+        if (!branchMap[commit.hash] && commit.message) {
+          const ticketMatch = commit.message.match(/\b([A-Z]+-\d+)\b/);
+          if (ticketMatch && ticketToBranch[ticketMatch[1]]) {
+            branchMap[commit.hash] = ticketToBranch[ticketMatch[1]];
+            hasChanges = true;
+          }
+        }
+      });
+
+      // 最后，为任何仍未分配分支的提交分配默认分支
+      const defaultBranch = branchList.includes('develop') ? 'develop' :
+        (branchList.includes('master') ? 'master' :
+          (branchList.includes('main') ? 'main' :
+            (branchList.length > 0 ? branchList[0] : 'master')));
+
+      commits.forEach(commit => {
+        if (!branchMap[commit.hash]) {
+          branchMap[commit.hash] = defaultBranch;
+          if (!branchesSet.has(defaultBranch)) {
+            branchesSet.add(defaultBranch);
+            branchList.push(defaultBranch);
+          }
+        }
+      });
+
+      // 创建操作数组
+      const operations = [];
+      let currentBranch = branchList.includes('master') ? 'master' : branchList[0]; // 默认从master分支开始，如果没有则用第一个分支
+
+      // 创建一个集合来跟踪已处理的提交
+      const processedCommits = new Set();
+
+      // 构建简化的Git操作历史
+      sortedCommits.forEach(commit => {
+        const branch = branchMap[commit.hash];
+        const isMerge = commit.isMergeCommit || (commit.parents && commit.parents.length > 1);
+
+        // 检查是否已处理过该提交（避免多次处理）
+        if (processedCommits.has(commit.hash)) {
+          return; // 跳过已处理的提交
+        }
+
+        // 分支变更处理 - 将分支切换信息合并到提交操作中
+        const branchChanged = branch !== currentBranch;
+        currentBranch = branch; // 更新当前分支
+
+        // 添加提交或合并操作
+        if (isMerge) {
+          // 尝试从消息中识别合并源分支
+          let sourceBranches = [];
+          if (commit.message) {
+            const msg = commit.message.toLowerCase();
+
+            // 检查标准合并消息格式
+            const mergeMatch = msg.match(/merge (?:branch |remote-tracking branch |)(\'|\")?([\w\/\.\-]+)(\'|\")?/i);
+            if (mergeMatch) {
+              sourceBranches.push(mergeMatch[2]);
+            }
+            // 检查其他合并指示格式
+            else if (msg.match(/\b(pull request|pr)\b.*?#\d+\b/i)) {
+              // 这可能是一个PR合并，尝试提取分支信息
+              const prBranchMatch = msg.match(/\bfrom\b\s+(\'|\")?([\w\/\.\-]+)(\'|\")?/i);
+              if (prBranchMatch) {
+                sourceBranches.push(prBranchMatch[2]);
+              } else {
+                // 如果找不到具体分支名，使用通用命名
+                sourceBranches.push('feature');
+              }
+            }
+            // 检查特性或修复提交格式
+            else if (msg.match(/\b(feat|feature|fix)\b.*?:/i)) {
+              const featureMatch = msg.match(/\b(feat|feature|fix)\(\s*([\w\/\.\-]+)\s*\)/i);
+              if (featureMatch) {
+                // 尝试从括号中提取分支或功能名称
+                sourceBranches.push(featureMatch[2]);
+              } else {
+                // 无法确定具体分支，使用通用命名
+                const type = msg.includes('feat') ? 'feature' : 'bugfix';
+                sourceBranches.push(type);
+              }
+            }
+          }
+
+          // 如果无法从消息中获取，尝试从父提交推断
+          if (sourceBranches.length === 0 && commit.parents && commit.parents.length > 0) {
+            sourceBranches = commit.parents
+              .filter(parent => parent !== commit.hash) // 避免自引用
+              .map(parent => branchMap[parent])
+              .filter(b => b && b !== branch);
+          }
+
+          if (sourceBranches.length > 0) {
+            // 创建一个合并操作，包含所有源分支信息
+            operations.push({
+              type: 'merge',
+              branch: branch,
+              hash: commit.hash,
+              message: commit.message,
+              sourceBranches: sourceBranches,
+              targetBranch: branch,
+              branchChanged: branchChanged // 添加分支切换信息
+            });
+          } else {
+            operations.push({
+              type: 'commit',
+              branch: branch,
+              isMergeCommit: true,
+              hash: commit.hash,
+              message: commit.message,
+              branchChanged: branchChanged // 添加分支切换信息
+            });
+          }
+        } else {
+          operations.push({
+            type: 'commit',
+            branch: branch,
+            hash: commit.hash,
+            message: commit.message,
+            branchChanged: branchChanged // 添加分支切换信息
+          });
+        }
+
+        // 标记该提交已处理
+        processedCommits.add(commit.hash);
+      });
+
+      return {
+        operations: operations,
+        branches: branchList
+      };
+    }
+
+    function processGitLogs(commits) {
+      const processedCommits = parseGitCommits(commits);
+
+      const graphData = generateCommitGraph(processedCommits);
+
+      return {
+        operations: graphData.operations,
+        branches: graphData.branches
+      };
+    }
+
+    // 处理提交数据并生成可视化图
+    const res = processGitLogs(commits);
+    console.log('结果：', res);
   </script>
 </body>
 

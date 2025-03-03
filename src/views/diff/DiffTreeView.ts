@@ -22,8 +22,8 @@ export const useDiffTreeView = createSingletonComposable(() => {
       let commit = storage.getCommit(hash)
 
       if (!commit) {
-        const { all: history } = await git.getHistory()
-        const historyCommit = history.find(c => c.hash === hash)
+        const { logResult } = await git.getHistory()
+        const historyCommit = logResult.all.find(c => c.hash === hash)
         if (!historyCommit)
           return
 
@@ -31,7 +31,7 @@ export const useDiffTreeView = createSingletonComposable(() => {
           ...historyCommit,
         }
 
-        storage.saveCommits(Array.from(history))
+        storage.saveCommits(Array.from(logResult.all))
       }
 
       commitDetails.value = commit

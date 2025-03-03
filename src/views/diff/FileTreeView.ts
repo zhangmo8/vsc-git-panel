@@ -47,7 +47,7 @@ export const useFileTreeView = createSingletonComposable(() => {
           const folderNode = new FolderNode(dirName, currentPath)
           const children: TreeViewNode[] = []
           folderChildren.set(currentPath, children)
-          
+
           node = {
             treeItem: folderNode,
             children,
@@ -156,62 +156,3 @@ export const useFileTreeView = createSingletonComposable(() => {
     refresh,
   }
 })
-
-// const useDiffTreeView = createSingletonComposable(() => {
-//   const selectedCommitHash = ref<string[]>([])
-
-//   const tree = useTreeView(
-//     `${EXTENSION_SYMBOL}.changes`,
-//     [],
-//     {
-//       canSelectMany: false,
-//     },
-//   )
-
-//   const refresh = (commitsHash: string[]) => {
-//     selectedCommitHash.value = commitsHash
-//     tree.refresh()
-//   }
-
-//   const getCommitByHash = async (hash?: string): Promise<CommitDetails | null> => {
-//     try {
-//       if (!hash) {
-//         throw new Error('Commit hash is required')
-//       }
-
-//       // First try to get from cache
-//       let commit = storageService.getCommit(hash)
-
-//       if (!commit) {
-//         // Only fetch all commits if not found in cache
-//         const history = await gitService.getHistory()
-//         const historyCommit = history.all.find(c => c.hash === hash)
-//         if (!historyCommit) {
-//           return null
-//         }
-
-//         commit = {
-//           hash: historyCommit.hash,
-//           authorName: historyCommit.author_name,
-//           authorEmail: historyCommit.author_email,
-//           date: historyCommit.date,
-//           message: historyCommit.message,
-//           body: historyCommit.body,
-//           stats: historyCommit.stats,
-//         }
-//       }
-
-//       return commit
-//     }
-//     catch (error) {
-//       console.error('Error getting commit details:', error)
-//       return null
-//     }
-//   }
-
-//   return {
-//     diffTreeView: tree,
-//     selectedCommitHash,
-//     refresh,
-//   }
-// })
