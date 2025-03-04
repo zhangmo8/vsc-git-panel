@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 
 import CommitTable from './components/CommitTable/index.vue'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit } from '@/git'
+import type { CommitGraph } from '@/git'
 
 declare global {
   interface Window {
@@ -14,15 +14,15 @@ declare global {
 }
 
 interface State {
-  commits: Commit[]
+  commits: CommitGraph
   selectedHash?: string
   filter?: string
 }
 
-const commits = ref<Commit[]>([])
+const commits = ref<CommitGraph>()
 const error = ref<string>('')
-const selectedHash = ref<string>('')
-const filter = ref<string>('')
+// const selectedHash = ref<string>('')
+// const filter = ref<string>('')
 
 // VSCode webview API
 const vscode = acquireVsCodeApi<State>()
@@ -34,7 +34,7 @@ window.addEventListener('message', (event: { data: any }) => {
 
   switch (message.command) {
     case CHANNEL.HISTORY:
-      commits.value = message.commits as Commit[]
+      commits.value = message.commits as CommitGraph
       break
     case 'error':
       error.value = message.message
@@ -47,7 +47,7 @@ onMounted(() => {
 })
 
 const transformedCommits = computed(() => {
-  return commits.value
+  return Array.from(commits.value?.logResult.all || []) || []
 })
 </script>
 
@@ -57,7 +57,7 @@ const transformedCommits = computed(() => {
       <input v-model="filter" type="text" placeholder="Search commits..." class="search-input">
     </div> -->
 
-    <CommitTable :commits="transformedCommits" class="git-graph-container" />
+    <CommitTable :commits="transformedCommits" :graph-data="commits?.operations || []" class="git-graph-container" />
 
     <div v-if="error" class="error">
       {{ error }}

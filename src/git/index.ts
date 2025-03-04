@@ -24,14 +24,12 @@ export const useGitService = createSingletonComposable(() => {
       const logResult = await git.log([
         '--all',
         '--stat',
-        '--max-count=50',
       ]) as ExtendedLogResult
 
       const rawParentsOutput = await git.raw([
         'log',
         '--all',
         '--pretty=format:%H %P',
-        '--max-count=50',
       ])
 
       const parentMap: { [hash: string]: string[] } = {}
@@ -102,16 +100,9 @@ export const useGitService = createSingletonComposable(() => {
         const branches = refs
           .filter(ref => ref.includes('refs/heads/') || ref.includes('refs/remotes/') || (!ref.includes('refs/') && !ref.includes('tag:')))
           .map((ref) => {
-            let branch = ref
-            if (ref.includes('refs/heads/')) {
-              branch = ref.replace('refs/heads/', '')
-            }
-            else if (ref.includes('refs/remotes/')) {
-              branch = ref.replace('refs/remotes/', '').split('/').slice(1).join('/')
-            }
-            else if (ref.includes('HEAD ->')) {
-              branch = ref.replace('HEAD -> ', '')
-            }
+            const branch = ref.replace('refs/heads/', '')
+              .replace('refs/remotes/', '').split('/').slice(1).join('/')
+              .replace('HEAD -> ', '')
             return branch
           })
           .filter(Boolean)
@@ -123,7 +114,6 @@ export const useGitService = createSingletonComposable(() => {
       }
     })
 
-    // 如果没有找到分支信息，使用默认分支名称
     if (branchSet.size === 0) {
       branchSet.add('master')
     }

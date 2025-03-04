@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { defineModel, ref } from 'vue'
-import ResizeHandle from './ResizeHandle.vue'
+import ResizeHandle from '../ResizeHandle/index.vue'
 
 interface ColumnWidths {
+  branch: number
   hash: number
   message: number
   stats: number
@@ -12,18 +13,18 @@ interface ColumnWidths {
 
 const modelValue = defineModel<ColumnWidths>()
 const isDragging = ref(false)
-const currentColumn = ref('')
+const currentColumn = ref<keyof ColumnWidths>()
 const startX = ref(0)
 const startWidth = ref(0)
 
-function handleDragStart(e: MouseEvent, column: string) {
+function handleDragStart(e: MouseEvent, column: keyof ColumnWidths) {
   e.preventDefault()
   e.stopPropagation()
 
   isDragging.value = true
   currentColumn.value = column
   startX.value = e.clientX
-  startWidth.value = modelValue.value[column]
+  startWidth.value = modelValue.value?.[column] || 0
 
   document.addEventListener('mousemove', handleDragging, { passive: false })
   document.addEventListener('mouseup', handleDragEnd, { once: true })
@@ -45,7 +46,7 @@ function handleDragging(e: MouseEvent) {
   const diff = e.clientX - startX.value
   const newWidth = Math.max(100, startWidth.value + diff)
 
-  modelValue.value[currentColumn.value] = newWidth
+  modelValue.value![currentColumn.value!] = newWidth
 }
 
 function handleDragEnd() {
@@ -53,7 +54,7 @@ function handleDragEnd() {
     return
 
   isDragging.value = false
-  currentColumn.value = ''
+  currentColumn.value = undefined
 
   document.removeEventListener('mousemove', handleDragging)
   document.removeEventListener('mouseup', handleDragEnd)
@@ -66,19 +67,23 @@ function handleDragEnd() {
 
 <template>
   <li class="commit-header">
-    <span class="hash-col column-header" :style="{ width: `${modelValue.hash}px` }">
+    <!-- <span class="column-header" :style="{ width: `${modelValue?.branch}px` }">
+      Branch
+      <ResizeHandle :is-active="currentColumn === 'branch'" @mousedown="handleDragStart($event, 'branch')" />
+    </span> -->
+    <span class="hash-col column-header" :style="{ width: `${modelValue?.hash}px` }">
       CommitId
       <ResizeHandle :is-active="currentColumn === 'hash'" @mousedown="handleDragStart($event, 'hash')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue.message}px` }">
+    <span class="column-header" :style="{ width: `${modelValue?.message}px` }">
       Message
       <ResizeHandle :is-active="currentColumn === 'message'" @mousedown="handleDragStart($event, 'message')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue.stats}px` }">
+    <span class="column-header" :style="{ width: `${modelValue?.stats}px` }">
       Changes
       <ResizeHandle :is-active="currentColumn === 'stats'" @mousedown="handleDragStart($event, 'stats')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue.author}px` }">
+    <span class="column-header" :style="{ width: `${modelValue?.author}px` }">
       Author
       <ResizeHandle :is-active="currentColumn === 'author'" @mousedown="handleDragStart($event, 'author')" />
     </span>

@@ -5,10 +5,11 @@ import dayjs from 'dayjs'
 import ColumnHeader from './ColumnHeader.vue'
 import ListItem from './ListItem.vue'
 
-import type { Commit } from '@/git'
+import type { Commit, GitOperation } from '@/git'
 
 const props = defineProps<{
   commits: Commit[]
+  graphData: GitOperation[]
 }>()
 
 const ITEMS_PER_PAGE = 45
@@ -17,6 +18,7 @@ const observer = ref<IntersectionObserver | null>(null)
 const loadingTriggerRef = ref<HTMLElement | null>(null)
 
 const columnWidths = ref({
+  branch: 120,
   hash: 80,
   message: 200,
   stats: 140,
@@ -35,8 +37,7 @@ const columnWidths = ref({
 //   'var(--vscode-charts-purple)',
 //   'var(--vscode-charts-green)',
 // ]
-
-const graphData = computed(() => {
+const commitData = computed(() => {
   return (props.commits || []).map(commit => ({
     ...commit,
     date: dayjs(commit.date).format('YYYY-MM-DD HH:mm'),
@@ -45,13 +46,13 @@ const graphData = computed(() => {
 
 const visibleCommits = computed(() => {
   const end = currentPage.value * ITEMS_PER_PAGE
-  return graphData.value.slice(0, end)
+  return commitData.value.slice(0, end)
 })
 
 onMounted(() => {
   observer.value = new IntersectionObserver((entries) => {
     const target = entries[0]
-    if (target.isIntersecting && currentPage.value * ITEMS_PER_PAGE < graphData.value.length) {
+    if (target.isIntersecting && currentPage.value * ITEMS_PER_PAGE < commitData.value.length) {
       currentPage.value++
     }
   })
@@ -72,9 +73,17 @@ onUnmounted(() => {
   <div class="git-graph">
     <ul class="commit-list">
       <ColumnHeader v-model="columnWidths" />
-      <ListItem v-for="commit in visibleCommits" :key="commit.hash" :commit="commit" :column-widths="columnWidths" />
+      <ListItem 
+        v-for="(commit, index) in visibleCommits" 
+        :key="commit.hash" 
+        :graph-data="graphData[index]" 
+        :prev-graph-data="index > 0 ? graphData[index - 1] : null"
+        :next-graph-data="index < graphData.length - 1 ? graphData[index + 1] : null"
+        :commit="commit" 
+        :column-widths="columnWidths" 
+      />
       <li ref="loadingTriggerRef" class="loading-trigger">
-        <div v-if="visibleCommits.length < graphData.length" class="loading-text">
+        <div v-if="visibleCommits.length < commitData.length" class="loading-text">
           Loading more commits...
         </div>
       </li>

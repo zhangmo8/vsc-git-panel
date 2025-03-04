@@ -1,11 +1,21 @@
 <script setup lang="ts">
+import { ref } from 'vue'
+// import GitGraph from './GitGraph.vue'
+import CopyButton from '../CopyButton/index.vue'
+
 import { WEBVIEW_CHANNEL } from '@/constant'
-import type { Commit } from '@/git'
+
+import type { Commit, GitOperation } from '@/git'
 
 const props = defineProps<{
   commit: Commit
+  graphData: GitOperation
+  prevGraphData?: GitOperation
+  nextGraphData?: GitOperation
   columnWidths: Record<string, number>
 }>()
+
+const hoveredCell = ref<string | null>(null)
 
 function handleCommitClick() {
   try {
@@ -37,9 +47,29 @@ function handleDoubleClick() {
 
 <template>
   <li class="commit-row" @click="handleCommitClick" @dblclick="handleDoubleClick">
-    <span class="hash-col commit-cell" :style="{ width: `${columnWidths.hash}px` }">{{ commit.hash.substring(0, 7)
-    }}</span>
-    <span class="commit-cell" :style="{ width: `${columnWidths.message}px` }">{{ commit.message }}</span>
+    <!-- <div class="branch-col commit-cell" :style="{ width: `${columnWidths.branch}px` }">
+      <GitGraph
+        :graph-data="graphData"
+        :prev-graph-data="prevGraphData"
+        :next-graph-data="nextGraphData"
+      />
+    </div> -->
+    <span
+      class="hash-col commit-cell" :style="{ width: `${columnWidths.hash}px` }" @mouseenter="hoveredCell = 'hash'"
+      @mouseleave="hoveredCell = null"
+    >
+      {{ commit.hash.substring(0, 7) }}
+      <CopyButton v-show="hoveredCell === 'hash'" :copy-text="commit.hash" />
+    </span>
+
+    <span
+      class="commit-cell" :style="{ width: `${columnWidths.message}px` }" @mouseenter="hoveredCell = 'message'"
+      @mouseleave="hoveredCell = null"
+    >
+      {{ commit.message }}
+      <CopyButton v-show="hoveredCell === 'message'" :copy-text="commit.message" />
+    </span>
+
     <span class="commit-cell" :style="{ width: `${columnWidths.stats}px` }">
       <span v-if="commit.diff" class="commit-stats">
         <span class="files">{{ commit.diff.changed }} files</span>
@@ -47,7 +77,15 @@ function handleDoubleClick() {
         <span v-if="commit.diff.deletions" class="deletions">-{{ commit.diff.deletions }}</span>
       </span>
     </span>
-    <span class="commit-cell" :style="{ width: `${columnWidths.author}px` }">{{ commit.authorName }}</span>
+
+    <span
+      class="commit-cell" :style="{ width: `${columnWidths.author}px` }" @mouseenter="hoveredCell = 'authorName'"
+      @mouseleave="hoveredCell = null"
+    >
+      {{ commit.authorName }}
+      <CopyButton v-show="hoveredCell === 'authorName'" :copy-text="`${commit.authorName} <${commit.authorEmail}>`" />
+    </span>
+
     <span class="commit-cell date" :style="{ width: `${columnWidths.date}px` }">{{ commit.date }}</span>
   </li>
 </template>
@@ -60,7 +98,7 @@ function handleDoubleClick() {
   cursor: pointer;
   width: 100%;
   box-sizing: border-box;
-  padding: 8px;
+  position: relative;
 }
 
 .commit-row:hover {
@@ -71,22 +109,24 @@ function handleDoubleClick() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  padding: 8px;
+  position: relative;
+}
+
+.branch-col {
+  position: relative;
+  padding: 0px;
+  z-index: 1;
 }
 
 .hash-col {
   color: var(--vscode-gitDecoration-addedResourceForeground);
 }
 
-.date {
-  padding-right: 16px;
-  color: var(--vscode-descriptionForeground);
-}
-
 .commit-stats {
-  display: inline-flex;
+  font-size: 0.85em;
+  display: flex;
   gap: 8px;
-  font-size: 12px;
-  white-space: nowrap;
 }
 
 .additions {
@@ -95,5 +135,10 @@ function handleDoubleClick() {
 
 .deletions {
   color: var(--vscode-gitDecoration-deletedResourceForeground);
+}
+
+.date {
+  color: var(--vscode-descriptionForeground);
+  font-size: 0.9em;
 }
 </style>

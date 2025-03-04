@@ -7,7 +7,6 @@ import {
   executeCommand,
   ref,
   useWebviewView,
-  watch,
 } from 'reactive-vscode'
 
 import { useDiffTreeView } from './diff/DiffTreeView'
@@ -16,7 +15,7 @@ import { useGitService } from '@/git'
 import { useStorage } from '@/storage'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit } from '@/git'
+import type { Commit, CommitGraph } from '@/git'
 
 function getNonce() {
   let text = ''
@@ -37,7 +36,7 @@ export const useGitPanelView = createSingletonComposable(() => {
   }
 
   const gitChangesProvider = useDiffTreeView()
-  const commits = ref<Commit[]>(storage.getCommits())
+  const commits = ref<CommitGraph>(storage.getCommits())
 
   const isDev = context.value?.extensionMode === ExtensionMode.Development
 
@@ -127,10 +126,18 @@ export const useGitPanelView = createSingletonComposable(() => {
 
   async function refreshHistory(forceRefresh: boolean = false) {
     try {
-      if (commits.value.length === 0 || forceRefresh) {
-        const { logResult } = await git.getHistory()
-        commits.value = Array.from(logResult.all)
-        storage.saveCommits(commits.value)
+      if (commits.value.logResult.total === 0 || forceRefresh) {
+        const { logResult, operations, branches } = await git.getHistory()
+        commits.value = {
+          logResult: {
+            all: Array.from(logResult.all),
+            total: logResult.total,
+            latest: null,
+          },
+          operations,
+          branches,
+        }
+        storage.saveCommits({ operations, branches, logResult })
       }
 
       postMessage({

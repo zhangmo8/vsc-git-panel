@@ -1,29 +1,38 @@
 import { createSingletonComposable, extensionContext } from 'reactive-vscode'
-import type { Commit } from '@/git/types'
+import type { Commit, CommitGraph } from '@/git/types'
 
 const COMMITS_KEY = 'git-panel.commits'
 
 export const useStorage = createSingletonComposable(() => {
-  function saveCommits(commits: Commit[]) {
+  function saveCommits(commits: CommitGraph) {
     extensionContext.value?.globalState.update(COMMITS_KEY, commits)
   }
 
   function updateCommitFiles(commitHash: string, files: Array<{ status: string, path: string }>) {
-    const commits = getCommits()
-    const commit = commits.find(c => c.hash === commitHash)
+    const { operations, branches, logResult } = getCommits()
+    const commit = logResult.all.find(c => c.hash === commitHash)
 
     if (commit) {
       commit.files = files
-      saveCommits(commits)
+      saveCommits({ operations, branches, logResult })
     }
   }
 
-  function getCommits(): Commit[] {
-    return extensionContext.value?.globalState.get<Commit[]>(COMMITS_KEY) || []
+  function getCommits(): CommitGraph {
+    return extensionContext.value?.globalState.get<CommitGraph>(COMMITS_KEY) || ({
+      operations: [],
+      branches: [],
+      logResult: {
+        all: [],
+        total: 0,
+      },
+    }) as unknown as CommitGraph
   }
 
   function getCommit(hash: string): Commit | undefined {
-    const commits = getCommits()
+    const { logResult: { all: commits } } = getCommits()
+    if (!commits)
+      return
     return commits.find(commit => commit.hash === hash)
   }
 
