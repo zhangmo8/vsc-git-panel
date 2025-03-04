@@ -12,6 +12,9 @@ const props = defineProps<{
   graphData: GitOperation[]
 }>()
 
+// Selected commit hash state
+const selectedCommitHash = ref<string | null>(null)
+
 const ITEMS_PER_PAGE = 45
 const currentPage = ref(1)
 const observer = ref<IntersectionObserver | null>(null)
@@ -49,6 +52,11 @@ const visibleCommits = computed(() => {
   return commitData.value.slice(0, end)
 })
 
+// Handle commit selection
+function handleCommitSelected(hash: string) {
+  selectedCommitHash.value = hash
+}
+
 onMounted(() => {
   observer.value = new IntersectionObserver((entries) => {
     const target = entries[0]
@@ -80,7 +88,9 @@ onUnmounted(() => {
         :prev-graph-data="index > 0 ? graphData[index - 1] : null"
         :next-graph-data="index < graphData.length - 1 ? graphData[index + 1] : null"
         :commit="commit" 
-        :column-widths="columnWidths" 
+        :column-widths="columnWidths"
+        :is-selected="selectedCommitHash === commit.hash"
+        @select="handleCommitSelected(commit.hash)"
       />
       <li ref="loadingTriggerRef" class="loading-trigger">
         <div v-if="visibleCommits.length < commitData.length" class="loading-text">

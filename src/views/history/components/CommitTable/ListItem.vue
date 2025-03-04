@@ -13,11 +13,17 @@ const props = defineProps<{
   prevGraphData?: GitOperation
   nextGraphData?: GitOperation
   columnWidths: Record<string, number>
+  isSelected?: boolean
 }>()
+
+const emit = defineEmits(['select'])
 
 const hoveredCell = ref<string | null>(null)
 
 function handleCommitClick() {
+  // Emit the selection event
+  emit('select')
+
   try {
     if (window.vscode) {
       window.vscode.postMessage({
@@ -46,7 +52,12 @@ function handleDoubleClick() {
 </script>
 
 <template>
-  <li class="commit-row" @click="handleCommitClick" @dblclick="handleDoubleClick">
+  <li
+    class="commit-row"
+    :class="{ selected: isSelected }"
+    @click="handleCommitClick"
+    @dblclick="handleDoubleClick"
+  >
     <!-- <div class="branch-col commit-cell" :style="{ width: `${columnWidths.branch}px` }">
       <GitGraph
         :graph-data="graphData"
@@ -103,6 +114,15 @@ function handleDoubleClick() {
 
 .commit-row:hover {
   background-color: var(--vscode-list-hoverBackground);
+}
+
+.commit-row.selected {
+  background-color: var(--vscode-list-activeSelectionBackground);
+  color: var(--vscode-list-activeSelectionForeground);
+}
+
+.commit-row.selected .hash-col {
+  color: var(--vscode-list-activeSelectionForeground);
 }
 
 .commit-cell {
