@@ -1,11 +1,11 @@
 import { TreeItem, TreeItemCollapsibleState, Uri } from 'vscode'
-import type { FileTreeItem } from '../types'
 import { EXTENSION_SYMBOL } from '@/constant'
 
 export class FileNode extends TreeItem {
   constructor(
     public readonly path: string,
     public readonly status: string,
+    public readonly commitHash: string,
     public readonly oldPath?: string,
   ) {
     const label = path.split('/').pop() || path
@@ -28,15 +28,7 @@ export class FileNode extends TreeItem {
     this.command = {
       command: `${EXTENSION_SYMBOL}.openDiff`,
       title: 'Show Changes',
-      arguments: [{ path: this.path, status: this.status, oldPath: this.oldPath }],
+      arguments: [{ path: this.path, status: this.status, oldPath: this.oldPath, commitHash: this.commitHash }],
     }
-  }
-
-  static fromFileItem(item: FileTreeItem): FileNode {
-    return new FileNode(
-      item.path,
-      item.status,
-      'oldPath' in item ? item.oldPath : undefined,
-    )
   }
 }

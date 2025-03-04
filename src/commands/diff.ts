@@ -9,11 +9,11 @@ import { useDiffTreeView } from '@/views/diff'
 export default function diffCommand() {
   const { getPreviousCommit } = useGitService()
   const workspaceFolders = useWorkspaceFolders()
-  const { selectedCommitHash } = useDiffTreeView()
+  const { selectedCommitHashes } = useDiffTreeView()
 
-  return async (fileInfo: { path: string, status: string }) => {
-    const commit = selectedCommitHash.value
-    if (!commit) {
+  return async (fileInfo: { path: string, status: string, commitHash: string, oldPath?: string }) => {
+    const commits = selectedCommitHashes.value
+    if (!commits || commits.length === 0) {
       return
     }
 
@@ -23,15 +23,15 @@ export default function diffCommand() {
     }
 
     const uri = Uri.joinPath(workspaceRoot, fileInfo.path)
-    const title = `${fileInfo.path} (${commit})`
+    const title = `${fileInfo.path} (${fileInfo.commitHash})`
 
     // For modified files, show diff between current commit and its parent
     if (fileInfo.status === GIT_STATUS.MODIFIED) {
       try {
-        const previousCommit = await getPreviousCommit(commit)
+        const previousCommit = await getPreviousCommit(fileInfo.commitHash)
         if (previousCommit) {
           const leftUri = toGitUri(uri, previousCommit)
-          const rightUri = toGitUri(uri, commit)
+          const rightUri = toGitUri(uri, fileInfo.commitHash)
           await executeCommand('vscode.diff', leftUri, rightUri, title)
           return
         }
@@ -44,7 +44,7 @@ export default function diffCommand() {
 
     // For added files, show the entire file content
     if (fileInfo.status === GIT_STATUS.ADDED) {
-      const gitUri = toGitUri(uri, commit)
+      const gitUri = toGitUri(uri, fileInfo.commitHash)
       await executeCommand('vscode.open', gitUri)
     }
   }

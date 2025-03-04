@@ -2,7 +2,6 @@ import type { TreeViewNode } from 'reactive-vscode'
 import { createSingletonComposable, ref } from 'reactive-vscode'
 import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
-import { EXTENSION_SYMBOL } from '@/constant'
 import { type CommitFile, useGitService } from '@/git'
 import { useStorage } from '@/storage'
 import { parseGitStatus } from '@/utils'
@@ -11,7 +10,7 @@ export const useFileTreeView = createSingletonComposable(() => {
   const git = useGitService()
   const storage = useStorage()
 
-  function buildFileTree(files: CommitFile[]): TreeViewNode[] {
+  function buildFileTree(files: CommitFile[], commitHash: string): TreeViewNode[] {
     const root = new Map<string, TreeViewNode>()
     const folderChildren = new Map<string, TreeViewNode[]>()
 
@@ -25,6 +24,7 @@ export const useFileTreeView = createSingletonComposable(() => {
           treeItem: new FileNode(
             normalizedPath,
             file.status,
+            commitHash,
             'oldPath' in file ? file.oldPath : undefined,
           ),
         })
@@ -75,6 +75,7 @@ export const useFileTreeView = createSingletonComposable(() => {
           treeItem: new FileNode(
             normalizedPath,
             file.status,
+            commitHash,
             'oldPath' in file ? file.oldPath : undefined,
           ),
         }
@@ -96,7 +97,7 @@ export const useFileTreeView = createSingletonComposable(() => {
 
       if (commit?.files) {
         return {
-          files: buildFileTree(commit.files),
+          files: buildFileTree(commit.files, commit?.hash),
           total: commit.files.length,
         }
       }
@@ -137,7 +138,7 @@ export const useFileTreeView = createSingletonComposable(() => {
         })
 
       return {
-        files: buildFileTree(files),
+        files: buildFileTree(files, commitHash),
         total: files.length,
       }
     }
@@ -147,12 +148,7 @@ export const useFileTreeView = createSingletonComposable(() => {
     }
   }
 
-  const refresh = (commitHash: string) => {
-    getChildren(commitHash)
-  }
-
   return {
     getChildren,
-    refresh,
   }
 })

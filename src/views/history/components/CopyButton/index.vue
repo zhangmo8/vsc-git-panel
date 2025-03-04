@@ -48,8 +48,4 @@ async function copyToClipboard() {
   opacity: 1;
   background-color: var(--vscode-button-hoverBackground);
 }
-
-.copy-button.success {
-  background-color: var(--vscode-gitDecoration-addedResourceForeground);
-}
 </style>

@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, toRaw } from 'vue'
 import dayjs from 'dayjs'
 
 import ColumnHeader from './ColumnHeader.vue'
 import ListItem from './ListItem.vue'
 
 import type { Commit, GitOperation } from '@/git'
+import { WEBVIEW_CHANNEL } from '@/constant'
 
 const props = defineProps<{
   commits: Commit[]
@@ -13,7 +14,10 @@ const props = defineProps<{
 }>()
 
 // Selected commit hash state
-const selectedCommitHash = ref<string | null>(null)
+const selectedCommitHashes = ref<string[]>([])
+const isDragging = ref(false)
+const dragStartIndex = ref<number | null>(null)
+const dragEndIndex = ref<number | null>(null)
 
 const ITEMS_PER_PAGE = 45
 const currentPage = ref(1)
@@ -29,17 +33,6 @@ const columnWidths = ref({
   date: 160,
 })
 
-// Calculate branch positions and paths
-// const COLUMN_WIDTH = 14
-// const DOT_SIZE = 6
-// const BRANCH_COLORS = [
-//   'var(--vscode-charts-blue)',
-//   'var(--vscode-charts-red)',
-//   'var(--vscode-charts-yellow)',
-//   'var(--vscode-charts-orange)',
-//   'var(--vscode-charts-purple)',
-//   'var(--vscode-charts-green)',
-// ]
 const commitData = computed(() => {
   return (props.commits || []).map(commit => ({
     ...commit,
@@ -52,9 +45,38 @@ const visibleCommits = computed(() => {
   return commitData.value.slice(0, end)
 })
 
-// Handle commit selection
-function handleCommitSelected(hash: string) {
-  selectedCommitHash.value = hash
+function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
+  if (event.shiftKey && selectedCommitHashes.value.length > 0) {
+    // Range selection with shift key
+    const lastSelectedIndex = visibleCommits.value.findIndex(
+      commit => commit.hash === selectedCommitHashes.value[selectedCommitHashes.value.length - 1],
+    )
+    if (lastSelectedIndex !== -1) {
+      const startIdx = Math.min(lastSelectedIndex, index)
+      const endIdx = Math.max(lastSelectedIndex, index)
+      const hashesToSelect = visibleCommits.value
+        .slice(startIdx, endIdx + 1)
+        .map(commit => commit.hash)
+
+      // Add all hashes in range without duplicates
+      selectedCommitHashes.value = [...new Set([...selectedCommitHashes.value, ...hashesToSelect])]
+    }
+  }
+  else {
+    selectedCommitHashes.value = [hash]
+  }
+
+  try {
+    if (window.vscode) {
+      window.vscode.postMessage({
+        command: WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS,
+        commitHashes: JSON.stringify(toRaw(selectedCommitHashes.value)),
+      })
+    }
+  }
+  catch (error) {
+    console.error('Error sending commit details:', error)
+  }
 }
 
 onMounted(() => {
@@ -78,19 +100,15 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="git-graph">
+  <div class="git-graph" @mouseleave="isDragging = false">
     <ul class="commit-list">
       <ColumnHeader v-model="columnWidths" />
-      <ListItem 
-        v-for="(commit, index) in visibleCommits" 
-        :key="commit.hash" 
-        :graph-data="graphData[index]" 
+      <ListItem
+        v-for="(commit, index) in visibleCommits" :key="commit.hash" :graph-data="graphData[index]"
         :prev-graph-data="index > 0 ? graphData[index - 1] : null"
-        :next-graph-data="index < graphData.length - 1 ? graphData[index + 1] : null"
-        :commit="commit" 
-        :column-widths="columnWidths"
-        :is-selected="selectedCommitHash === commit.hash"
-        @select="handleCommitSelected(commit.hash)"
+        :next-graph-data="index < graphData.length - 1 ? graphData[index + 1] : null" :commit="commit"
+        :column-widths="columnWidths" :is-selected="selectedCommitHashes.includes(commit.hash)"
+        @select="(event) => handleCommitSelected(commit.hash, index, event)"
       />
       <li ref="loadingTriggerRef" class="loading-trigger">
         <div v-if="visibleCommits.length < commitData.length" class="loading-text">

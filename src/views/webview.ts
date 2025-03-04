@@ -102,7 +102,8 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
             try {
-              (await gitChangesProvider).refresh(message.commitHash)
+              const hashes: string[] = JSON.parse(message.commitHashes)
+              ;(await gitChangesProvider).refresh(hashes)
             }
             catch (error) {
               postMessage({

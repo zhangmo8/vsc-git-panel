@@ -7,7 +7,7 @@ import { WEBVIEW_CHANNEL } from '@/constant'
 
 import type { Commit, GitOperation } from '@/git'
 
-const props = defineProps<{
+defineProps<{
   commit: Commit
   graphData: GitOperation
   prevGraphData?: GitOperation
@@ -20,21 +20,8 @@ const emit = defineEmits(['select'])
 
 const hoveredCell = ref<string | null>(null)
 
-function handleCommitClick() {
-  // Emit the selection event
-  emit('select')
-
-  try {
-    if (window.vscode) {
-      window.vscode.postMessage({
-        command: WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS,
-        commitHash: props.commit.hash,
-      })
-    }
-  }
-  catch (error) {
-    console.error('Error sending commit details:', error)
-  }
+function handleCommitClick(event: MouseEvent) {
+  emit('select', event)
 }
 
 function handleDoubleClick() {
@@ -110,6 +97,7 @@ function handleDoubleClick() {
   width: 100%;
   box-sizing: border-box;
   position: relative;
+  user-select: none;
 }
 
 .commit-row:hover {
