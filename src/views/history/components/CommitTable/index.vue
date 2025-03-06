@@ -14,10 +14,11 @@ const props = defineProps<{
 }>()
 
 // Selected commit hash state
-const selectedCommitHashes = ref<string[]>([])
+const selectedCommitHashes = defineModel<string[]>({ default: [] })
+
 const isDragging = ref(false)
-const dragStartIndex = ref<number | null>(null)
-const dragEndIndex = ref<number | null>(null)
+const selectionStart = ref<number | null>(null)
+const dragEndIndex = ref<number>(0)
 
 const ITEMS_PER_PAGE = 45
 const currentPage = ref(1)
@@ -46,8 +47,9 @@ const visibleCommits = computed(() => {
 })
 
 function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
+  isDragging.value = true
+
   if (event.shiftKey && selectedCommitHashes.value.length > 0) {
-    // Range selection with shift key
     const lastSelectedIndex = visibleCommits.value.findIndex(
       commit => commit.hash === selectedCommitHashes.value[selectedCommitHashes.value.length - 1],
     )
@@ -62,21 +64,66 @@ function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
       selectedCommitHashes.value = [...new Set([...selectedCommitHashes.value, ...hashesToSelect])]
     }
   }
+  else if (event.ctrlKey || event.metaKey) {
+    if (selectedCommitHashes.value.includes(hash)) {
+      selectedCommitHashes.value = selectedCommitHashes.value.filter(h => h !== hash)
+    }
+    else {
+      selectedCommitHashes.value.push(hash)
+    }
+  }
   else {
     selectedCommitHashes.value = [hash]
   }
 
-  try {
-    if (window.vscode) {
+  handleMouseUp()
+}
+
+function handleMouseDown(index: number, event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (target.closest('.copy-button')) {
+    return
+  }
+
+  if (!event.ctrlKey && !event.metaKey && !event.shiftKey) {
+    isDragging.value = true
+    selectionStart.value = index
+    dragEndIndex.value = index
+    selectedCommitHashes.value = [visibleCommits.value[index].hash]
+  }
+}
+
+function handleMouseOver(index: number) {
+  if (isDragging.value && selectionStart.value !== null) {
+    const startIdx = Math.min(selectionStart.value, index)
+    const endIdx = Math.max(selectionStart.value, index)
+    const hashesToSelect = visibleCommits.value
+      .slice(startIdx, endIdx + 1)
+      .map(commit => commit.hash)
+
+    selectedCommitHashes.value = hashesToSelect
+  }
+}
+
+function handleMouseUp() {
+  const wasDragging = isDragging.value
+
+  isDragging.value = false
+
+  if (wasDragging) {
+    try {
       window.vscode.postMessage({
         command: WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS,
         commitHashes: JSON.stringify(toRaw(selectedCommitHashes.value)),
       })
     }
+    catch (error) {
+      console.error('Error sending commit details:', error)
+    }
   }
-  catch (error) {
-    console.error('Error sending commit details:', error)
-  }
+
+  // 最后重置选择起点
+  selectionStart.value = null
 }
 
 onMounted(() => {
@@ -100,15 +147,20 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="git-graph" @mouseleave="isDragging = false">
+  <div class="git-graph" @mouseleave="handleMouseUp" @mouseup="handleMouseUp">
     <ul class="commit-list">
       <ColumnHeader v-model="columnWidths" />
       <ListItem
         v-for="(commit, index) in visibleCommits" :key="commit.hash" :graph-data="graphData[index]"
         :prev-graph-data="index > 0 ? graphData[index - 1] : null"
         :next-graph-data="index < graphData.length - 1 ? graphData[index + 1] : null" :commit="commit"
-        :column-widths="columnWidths" :is-selected="selectedCommitHashes.includes(commit.hash)"
-        @select="(event) => handleCommitSelected(commit.hash, index, event)"
+        :column-widths="columnWidths" :is-selected="selectedCommitHashes.includes(commit.hash)" :class="{
+          'being-dragged': isDragging && selectionStart !== null
+            && ((index >= selectionStart && index <= dragEndIndex)
+              || (index <= selectionStart && index >= dragEndIndex)),
+        }" @select="(event) => handleCommitSelected(commit.hash, index, event)"
+        @mousedown="(event: MouseEvent) => handleMouseDown(index, event)"
+        @mouseover="() => isDragging && handleMouseOver(index)"
       />
       <li ref="loadingTriggerRef" class="loading-trigger">
         <div v-if="visibleCommits.length < commitData.length" class="loading-text">
@@ -124,6 +176,8 @@ onUnmounted(() => {
   width: 100%;
   overflow: auto;
   font-family: var(--vscode-editor-font-family);
+  user-select: none;
+  /* Prevent text selection during drag */
 }
 
 .commit-list {
@@ -144,5 +198,9 @@ onUnmounted(() => {
 .loading-text {
   font-size: 12px;
   color: var(--vscode-descriptionForeground);
+}
+
+.being-dragged {
+  background-color: var(--vscode-list-activeSelectionBackground, rgba(0, 0, 0, 0.1));
 }
 </style>

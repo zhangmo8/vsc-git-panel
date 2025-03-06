@@ -15,7 +15,7 @@ import { useGitService } from '@/git'
 import { useStorage } from '@/storage'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, CommitGraph } from '@/git'
+import type { CommitGraph } from '@/git'
 
 function getNonce() {
   let text = ''
@@ -154,9 +154,16 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  function clearSelection() {
+    postMessage({ command: CHANNEL.CLEAR_SELECTED })
+    gitChangesProvider.clearSelection()
+  }
+
   return {
     viewType: `${EXTENSION_SYMBOL}.history` as const,
     refreshHistory,
+    postMessage,
     forceRefresh,
+    clearSelection,
   }
 })

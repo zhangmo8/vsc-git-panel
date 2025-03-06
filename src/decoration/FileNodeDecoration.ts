@@ -17,7 +17,11 @@ export class FileNodeDecorationProvider implements FileDecorationProvider {
     try {
       const params = new URLSearchParams(decodeURIComponent(uri.query))
       const status = params.get('status')
+      const type = params.get('type')
 
+      if (type === 'folder') {
+        return undefined
+      }
       if (!status) {
         logger.warn('No status in URI:', uri.toString())
         return undefined

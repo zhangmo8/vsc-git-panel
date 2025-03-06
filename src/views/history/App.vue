@@ -28,6 +28,8 @@ const error = ref<string>('')
 const vscode = acquireVsCodeApi<State>()
 window.vscode = vscode
 
+const selectedCommitHashes = ref<string[]>([])
+
 // Handle messages from extension
 window.addEventListener('message', (event: { data: any }) => {
   const message = event.data
@@ -35,6 +37,9 @@ window.addEventListener('message', (event: { data: any }) => {
   switch (message.command) {
     case CHANNEL.HISTORY:
       commits.value = message.commits as CommitGraph
+      break
+    case CHANNEL.CLEAR_SELECTED:
+      selectedCommitHashes.value = []
       break
     case 'error':
       error.value = message.message
@@ -57,7 +62,7 @@ const transformedCommits = computed(() => {
       <input v-model="filter" type="text" placeholder="Search commits..." class="search-input">
     </div> -->
 
-    <CommitTable :commits="transformedCommits" :graph-data="commits?.operations || []" class="git-graph-container" />
+    <CommitTable v-model="selectedCommitHashes" :commits="transformedCommits" :graph-data="commits?.operations || []" class="git-graph-container" />
 
     <div v-if="error" class="error">
       {{ error }}

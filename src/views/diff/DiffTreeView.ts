@@ -24,11 +24,11 @@ export const useDiffTreeView = createSingletonComposable(() => {
       if (hashes.length === 0) {
         commitDetailsList.value = []
         files.value = []
-        return
+        return null
       }
 
       const commitList: CommitDetails[] = []
-      const allCommitFiles: Map<string, TreeViewNode[]> = new Map()
+      const allCommitFiles: Map<string, { files: TreeViewNode[], total: number }> = new Map()
       let totalFiles = 0
 
       for (const hash of hashes) {
@@ -51,15 +51,13 @@ export const useDiffTreeView = createSingletonComposable(() => {
 
         const { files: commitFiles, total } = await fileTree.getChildren(hash)
 
-        allCommitFiles.set(hash, commitFiles)
+        allCommitFiles.set(hash, { files: commitFiles, total })
         totalFiles += total
       }
 
       commitDetailsList.value = commitList
 
-      // Aggregate file changes for all selected commits
       if (hashes.length === 1) {
-        // Single commit view - show files directly
         files.value = [
           {
             treeItem: new CommitNode(
@@ -68,7 +66,7 @@ export const useDiffTreeView = createSingletonComposable(() => {
               TreeItemCollapsibleState.Expanded,
               'files',
             ),
-            children: allCommitFiles.get(hashes[0]) || [],
+            children: allCommitFiles.get(hashes[0])?.files || [],
           },
         ]
       }
@@ -81,12 +79,12 @@ export const useDiffTreeView = createSingletonComposable(() => {
           if (!commit)
             continue
 
-          const commitFiles = allCommitFiles.get(hash) || []
+          const { files: commitFiles, total } = allCommitFiles.get(hash) || { files: [], total: 0 }
           const shortHash = hash.substring(0, 7)
 
           commitNodes.push({
             treeItem: new CommitNode(
-              `${commitFiles.length} Files Changed`,
+              `${total} Files Changed`,
               `${shortHash}`,
               TreeItemCollapsibleState.Expanded,
               'git-commit',
@@ -98,8 +96,8 @@ export const useDiffTreeView = createSingletonComposable(() => {
         files.value = [
           {
             treeItem: new CommitNode(
-              'Selected Commits',
-              `${hashes.length} Commits Selected`,
+              'Multiple Commits Selected',
+              `${commitDetailsList.value.length} commits`,
               TreeItemCollapsibleState.Expanded,
               'git-commit',
             ),
@@ -151,16 +149,7 @@ export const useDiffTreeView = createSingletonComposable(() => {
       ]
     }
     else {
-      // Multiple commits view - summary information
       return [
-        {
-          treeItem: new CommitNode(
-            'Multiple Commits Selected',
-            `${commitDetailsList.value.length} commits`,
-            TreeItemCollapsibleState.None,
-            'git-commit',
-          ),
-        },
         ...files.value,
       ]
     }
@@ -174,7 +163,7 @@ export const useDiffTreeView = createSingletonComposable(() => {
     },
   )
 
-  async function refresh(hashes: string[]) {
+  async function refresh(hashes: string[] = []) {
     const currentHashes = new Set(selectedCommitHashes.value)
     const newHashes = new Set(hashes)
 
@@ -187,9 +176,16 @@ export const useDiffTreeView = createSingletonComposable(() => {
     await loadCommitDetails(hashes)
   }
 
+  function clearSelection() {
+    selectedCommitHashes.value = []
+    commitDetailsList.value = []
+    refresh()
+  }
+
   return {
     tree,
-    refresh,
     selectedCommitHashes,
+    refresh,
+    clearSelection,
   }
 })

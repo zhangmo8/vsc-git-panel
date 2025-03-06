@@ -19,7 +19,7 @@ export const useStorage = createSingletonComposable(() => {
   }
 
   function getCommits(): CommitGraph {
-    return extensionContext.value?.globalState.get<CommitGraph>(COMMITS_KEY) || ({
+    return (extensionContext.value?.globalState.get<CommitGraph>(COMMITS_KEY)) || ({
       operations: [],
       branches: [],
       logResult: {
@@ -31,6 +31,7 @@ export const useStorage = createSingletonComposable(() => {
 
   function getCommit(hash: string): Commit | undefined {
     const { logResult: { all: commits } } = getCommits()
+
     if (!commits)
       return
     return commits.find(commit => commit.hash === hash)
