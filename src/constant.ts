@@ -9,6 +9,7 @@ export const WEBVIEW_CHANNEL = {
 // vscode to webview channel
 export const CHANNEL = {
   HISTORY: 'history',
+  CLEAR_SELECTED: 'clear-selected',
 }
 
 export const EXTENSION_SYMBOL = 'git-panel'
