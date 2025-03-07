@@ -78,12 +78,6 @@
       },
       {
         "category": "GitPanel",
-        "command": "git-panel.history.filter",
-        "title": "Git History Filter",
-        "icon": "$(filter)"
-      },
-      {
-        "category": "GitPanel",
         "command": "git-panel.history.clear",
         "title": "Clear Selection",
         "icon": "$(clear-all)"
@@ -93,12 +87,6 @@
         "command": "git-panel.history.refresh",
         "title": "Refresh History",
         "icon": "$(refresh)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.history.switch.branch",
-        "title": "Select Branch",
-        "icon": "$(git-branch)"
       }
     ],
     "menus": {
@@ -110,11 +98,6 @@
         },
         {
           "command": "git-panel.history.clear",
-          "when": "view =~ /git-panel.history/",
-          "group": "navigation@4"
-        },
-        {
-          "command": "git-panel.history.switch.branch",
           "when": "view =~ /git-panel.history/",
           "group": "navigation@4"
         }

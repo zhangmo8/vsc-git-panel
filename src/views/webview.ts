@@ -6,6 +6,7 @@ import {
   createSingletonComposable,
   executeCommand,
   ref,
+  toRaw,
   useWebviewView,
 } from 'reactive-vscode'
 
@@ -138,7 +139,7 @@ export const useGitPanelView = createSingletonComposable(() => {
           operations,
           branches,
         }
-        storage.saveCommits({ operations, branches, logResult })
+        storage.saveCommits(toRaw({ operations, branches, logResult }))
       }
 
       postMessage({
