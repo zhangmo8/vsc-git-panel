@@ -3,7 +3,7 @@ import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
 import type { Commit, CommitGraph, ExtendedLogResult, GitOperation } from './types'
-import { logger } from '@/utils'
+import { getBranchColor, logger } from '@/utils'
 
 export * from './types'
 
@@ -44,6 +44,7 @@ export const useGitService = createSingletonComposable(() => {
         const { author_email, author_name } = commit
         commit.authorEmail = author_email
         commit.authorName = author_name
+
         commit.children = []
         hashToCommit[commit.hash] = commit
 
@@ -195,11 +196,15 @@ export const useGitService = createSingletonComposable(() => {
 
       if (isMerge) {
         const sourceBranches: string[] = []
+        const sourceBranchColors: Record<string, string> = {}
+
         if (commit.parents) {
           for (let i = 1; i < commit.parents.length; i++) {
-            const parentHash = commit.parents[i]
+            const parentHash: string = commit.parents[i]
             if (commitToBranch[parentHash]) {
-              sourceBranches.push(commitToBranch[parentHash])
+              const sourceBranch = commitToBranch[parentHash]
+              sourceBranches.push(sourceBranch)
+              sourceBranchColors[sourceBranch] = getBranchColor(sourceBranch)
             }
           }
         }
@@ -212,15 +217,32 @@ export const useGitService = createSingletonComposable(() => {
           sourceBranches,
           targetBranch: branch,
           branchChanged: branchChanged[commit.hash],
+          branchColor: getBranchColor(branch),
+          targetBranchColor: getBranchColor(branch),
+          sourceBranchColors,
         }
       }
       else {
+        let targetBranch: string | undefined
+        let targetBranchColor: string | undefined
+
+        if (branchChanged[commit.hash] && commit.parents && commit.parents.length > 0) {
+          const parentHash = commit.parents[0]
+          if (commitToBranch[parentHash] && commitToBranch[parentHash] !== branch) {
+            targetBranch = commitToBranch[parentHash]
+            targetBranchColor = getBranchColor(targetBranch)
+          }
+        }
+
         return {
           type: 'commit',
           branch,
           hash: commit.hash,
           message: commit.message,
           branchChanged: branchChanged[commit.hash],
+          branchColor: getBranchColor(branch),
+          targetBranch,
+          targetBranchColor,
         }
       }
     })

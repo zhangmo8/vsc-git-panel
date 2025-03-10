@@ -1,242 +1,172 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-
-interface Commit {
-  id: string
-  message: string
-  branch: string
-  branches: Array<{ name: string }>
-  hasParent: boolean
-  parentIds?: string[]
-  mergeTarget?: string
-}
+import { computed } from 'vue'
+import type { CommitOperation } from '@/git'
 
 const props = defineProps<{
-  commits: Array<Commit>
+  graphData?: CommitOperation
+  // 所有活跃分支的列表
+  activeBranches?: string[]
+  // 是否被选中
+  isSelected?: boolean
 }>()
 
-const SVG_WIDTH = 180
-const SVG_HEIGHT = 40
-const centerY = SVG_HEIGHT / 2
+// SVG宽度将根据分支数量动态计算
+const SVG_HEIGHT = 33
+// 图表配置
+const DOT_SIZE = 8
+const LINE_WIDTH = 2
+const HORIZONTAL_SPACING = 15
 
-// Enhanced branch tracking system
-const branchRegistry = ref<{
-  [branchName: string]: {
-    x: number
-    color: string
-    order: number
+// 不需要线条样式常量，所有类型都使用实线
+
+// 存储分支与其索引的映射关系
+const branchIndices = new Map<string, number>()
+let currentBranchIndex = 0
+
+// 计算水平位置 - 为每个新出现的分支分配一个唯一的水平位置
+function getBranchPosition(branchName: string) {
+  // 如果这个分支之前没有出现过，给它分配一个新的索引
+  if (!branchIndices.has(branchName)) {
+    branchIndices.set(branchName, currentBranchIndex++)
   }
-}>({})
 
-const colors = ['#0366d6', '#28a745', '#6f42c1', '#1da1f2', '#f66a0a', '#d73a49', '#00b5ad', '#6a737d', '#ea4aaa']
-
-function initializeBranches() {
-  // Clear existing branches first
-  branchRegistry.value = {}
-
-  // First pass: register all branches
-  const uniqueBranches = new Set<string>()
-
-  props.commits.forEach((commit) => {
-    uniqueBranches.add(commit.branch)
-    if (commit.branches) {
-      commit.branches.forEach(b => uniqueBranches.add(b.name))
-    }
-    if (commit.mergeTarget) {
-      uniqueBranches.add(commit.mergeTarget)
-    }
-  })
-
-  // Second pass: assign positions to each branch
-  const mainBranches = ['master', 'main', 'release', 'develop', 'staging']
-  const sortedBranches = Array.from(uniqueBranches).sort((a, b) => {
-    // Place main branches first in a specific order
-    const aIndex = mainBranches.indexOf(a)
-    const bIndex = mainBranches.indexOf(b)
-
-    if (aIndex >= 0 && bIndex >= 0)
-      return aIndex - bIndex
-    if (aIndex >= 0)
-      return -1
-    if (bIndex >= 0)
-      return 1
-    return a.localeCompare(b)
-  })
-
-  // Assign positions and colors
-  sortedBranches.forEach((branchName, index) => {
-    const color = colors[index % colors.length]
-
-    branchRegistry.value[branchName] = {
-      x: 30 + (index * 30),
-      color,
-      order: index,
-    }
-  })
+  // 根据分支索引计算水平位置
+  return (branchIndices.get(branchName)! + 1) * HORIZONTAL_SPACING
 }
 
-onMounted(() => {
-  initializeBranches()
+// 从graphData中获取分支颜色
+function getBranchColorFromData(branchName: string): string {
+  if (!props.graphData) return '#888888'
+  
+  // 检查当前提交的主分支颜色
+  if (props.graphData.branch === branchName && props.graphData.branchColor) {
+    return props.graphData.branchColor
+  }
+  
+  // 检查目标分支颜色
+  if (props.graphData.targetBranch === branchName && props.graphData.targetBranchColor) {
+    return props.graphData.targetBranchColor
+  }
+  
+  // 检查源分支颜色
+  if (props.graphData.sourceBranchColors && props.graphData.sourceBranchColors[branchName]) {
+    return props.graphData.sourceBranchColors[branchName]
+  }
+  
+  // 如果没有找到预处理的颜色，返回默认颜色
+  return '#888888'
+}
+
+// 计算当前提交涉及的所有分支
+const allBranches = computed(() => {
+  const branches = new Set<string>()
+
+  // 添加活跃分支列表中的所有分支
+  if (props.activeBranches && props.activeBranches.length) {
+    props.activeBranches.forEach(branch => branches.add(branch))
+  }
+
+  // 添加当前提交相关的分支
+  if (props.graphData) {
+    // 当前分支
+    if (props.graphData.branch) {
+      branches.add(props.graphData.branch)
+    }
+
+    // 目标分支
+    if (props.graphData.targetBranch) {
+      branches.add(props.graphData.targetBranch)
+    }
+
+    // 源分支列表
+    if (props.graphData.sourceBranches && props.graphData.sourceBranches.length) {
+      props.graphData.sourceBranches.forEach(branch => branches.add(branch))
+    }
+  }
+
+  return Array.from(branches)
 })
-
-function getBranchColor(branchName: string): string {
-  if (!branchRegistry.value[branchName]) {
-    initializeBranches()
-  }
-  return branchRegistry.value[branchName]?.color || '#999999'
-}
-
-function getBranchX(branchName: string): number {
-  if (!branchRegistry.value[branchName]) {
-    initializeBranches()
-  }
-  return branchRegistry.value[branchName]?.x || 20
-}
-
-function centerX(commit: { branch: string }): number {
-  return getBranchX(commit.branch)
-}
-
-// Compute total unique branches for dynamic SVG width
-const totalBranches = computed(() => {
-  const uniqueBranches = new Set<string>()
-  props.commits.forEach((commit) => {
-    uniqueBranches.add(commit.branch)
-    commit.branches.forEach(b => uniqueBranches.add(b.name))
-  })
-  return uniqueBranches.size
-})
-
-// Get commit by ID for connections
-function getCommitIndex(id: string): number {
-  return props.commits.findIndex(c => c.id === id)
-}
-
-// Determine if a commit is a merge commit
-function isMergeCommit(commit: Commit): boolean {
-  return !!commit.mergeTarget || (commit.parentIds && commit.parentIds.length > 1)
-}
-
-// Find parent commit
-function getParentCommit(commitId: string): Commit | undefined {
-  const index = getCommitIndex(commitId)
-  if (index < props.commits.length - 1) {
-    return props.commits[index + 1]
-  }
-  return undefined
-}
 </script>
 
 <template>
-  <table class="commit-table" :style="{ width: `${Math.max(350, totalBranches * 60)}px` }">
-    <tr v-for="(commit, index) in commits" :key="commit.id" class="commit-row">
-      <td class="graph-cell">
-        <svg
-          :width="Math.max(180, totalBranches * 60)"
-          :height="SVG_HEIGHT"
-          class="commit-graph"
-        >
-          <!-- Branch lines -->
-          <g v-for="branch in commit.branches" :key="branch.name">
-            <line
-              :x1="getBranchX(branch.name)"
-              y1="0"
-              :x2="getBranchX(branch.name)"
-              :y2="SVG_HEIGHT"
-              :stroke="getBranchColor(branch.name)"
-              stroke-width="2"
-              opacity="0.7"
-            />
-          </g>
-
-          <!-- Current branch line -->
+  <div class="git-graph">
+    <svg class="svg-wrapper" :width="(allBranches.length + 1) * HORIZONTAL_SPACING + HORIZONTAL_SPACING" :height="SVG_HEIGHT" xmlns="http://www.w3.org/2000/svg">
+      <!-- 绘制提交点和线条 -->
+      <g v-if="graphData">
+        <!-- 第1层: 先绘制所有活跃分支的竖线 -->
+        <template v-for="(branch, index) in allBranches" :key="`branch-${index}`">
+          <!-- 垂直分支线 - 贯穿整个图表 -->
           <line
-            :x1="centerX(commit)"
+            :x1="getBranchPosition(branch)"
             y1="0"
-            :x2="centerX(commit)"
+            :x2="getBranchPosition(branch)"
             :y2="SVG_HEIGHT"
-            :stroke="getBranchColor(commit.branch)"
-            stroke-width="2"
+            :stroke="getBranchColorFromData(branch)"
+            :stroke-width="LINE_WIDTH"
+            stroke-dasharray="none"
+            :stroke-opacity="isSelected ? 1 : 0.7"
           />
+        </template>
 
-          <!-- Merge connections -->
-          <g v-if="commit.mergeTarget">
-            <!-- Horizontal merge line -->
+        <!-- 第2层: 绘制合并线和分叉线 -->
+        <!-- 如果是合并提交，绘制合并线 -->
+        <template v-if="graphData.type === 'merge' && graphData.sourceBranches && graphData.sourceBranches.length">
+          <template v-for="(sourceBranch, index) in graphData.sourceBranches" :key="`merge-${index}`">
+            <!-- 只有当源分支与目标分支不同时才绘制合并线 -->
             <path
-              :d="`M ${centerX(commit)} ${centerY} Q ${(centerX(commit) + getBranchX(commit.mergeTarget)) / 2} ${centerY + 15} ${getBranchX(commit.mergeTarget)} ${centerY}`"
-              :stroke="getBranchColor(commit.branch)"
+              v-if="sourceBranch !== graphData.branch"
+              :d="`M ${getBranchPosition(sourceBranch)} ${SVG_HEIGHT / 2} C ${getBranchPosition(sourceBranch) + HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.branch) - HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.branch)} ${SVG_HEIGHT / 2}`"
+              :stroke="getBranchColorFromData(sourceBranch)"
+              :stroke-width="LINE_WIDTH"
+              stroke-dasharray="none"
+              :stroke-opacity="isSelected ? 1 : 0.7"
               fill="none"
-              stroke-width="2"
             />
-          </g>
+          </template>
+        </template>
 
-          <!-- Parent connection (straight vertical line) -->
-          <line
-            v-if="commit.hasParent && !isMergeCommit(commit)"
-            :x1="centerX(commit)"
-            y1="SVG_HEIGHT"
-            :x2="centerX(commit)"
-            :y2="centerY"
-            :stroke="getBranchColor(commit.branch)"
-            stroke-width="2"
+        <!-- 如果分支发生变化，绘制分支分叉线 -->
+        <template v-if="graphData.branchChanged && graphData.targetBranch && graphData.targetBranch !== graphData.branch">
+          <path
+            :d="`M ${getBranchPosition(graphData.branch)} ${SVG_HEIGHT / 2} C ${getBranchPosition(graphData.branch) + HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.targetBranch) - HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.targetBranch)} ${SVG_HEIGHT / 2}`"
+            :stroke="getBranchColorFromData(graphData.targetBranch)"
+            :stroke-width="LINE_WIDTH"
+            stroke-dasharray="none"
+            :stroke-opacity="isSelected ? 1 : 0.7"
+            fill="none"
           />
+        </template>
 
-          <!-- Commit point (circle) -->
+        <!-- 第3层: 最后绘制提交节点，确保在线的上面 -->
+        <template v-if="graphData.branch">
+          <!-- 提交节点 -->
           <circle
-            :cx="centerX(commit)"
-            :cy="centerY"
-            r="5"
-            :fill="getBranchColor(commit.branch)"
-            :stroke="index === 0 ? '#fff' : 'none'"
-            stroke-width="1.5"
+            :cx="getBranchPosition(graphData.branch)"
+            :cy="SVG_HEIGHT / 2"
+            :r="DOT_SIZE / 2"
+            :stroke="getBranchColorFromData(graphData.branch)"
+            :stroke-width="graphData.type === 'merge' ? 2 : 1"
+            :stroke-opacity="isSelected ? 1 : 0.8"
+            :fill="graphData.type === 'merge' ? 'white' : getBranchColorFromData(graphData.branch)"
+            :fill-opacity="isSelected ? 1 : 0.8"
           />
-        </svg>
-      </td>
-      <td class="commit-info">
-        <div class="commit-message" :class="[{ 'merge-commit': isMergeCommit(commit) }]">
-          {{ commit.message }}
-        </div>
-      </td>
-    </tr>
-  </table>
+        </template>
+      </g>
+    </svg>
+  </div>
 </template>
 
 <style scoped>
-.commit-table {
-  border-collapse: collapse;
-  table-layout: fixed;
-  max-width: 100%;
+.git-graph {
+  width: 100%;
+  padding: 0 8px;
+  overflow: auto;
+  position: absolute;
+  top: 0;
+  left: 0;
 }
 
-.commit-row {
-  height: 40px;
-}
-
-.graph-cell {
-  width: 180px;
-  max-width: 180px;
-  padding: 0;
-  position: relative;
-  overflow: hidden;
-}
-
-.commit-graph {
-  overflow: visible;
-}
-
-.commit-info {
-  padding-left: 10px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.commit-message {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  font-size: 14px;
-}
-
-.merge-commit {
-  font-style: italic;
+.svg-wrapper {
+  display: block;
 }
 </style>

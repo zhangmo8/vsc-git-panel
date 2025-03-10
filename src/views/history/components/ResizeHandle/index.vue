@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import { ref } from 'vue'
-
 const props = defineProps<{
   isActive: boolean
 }>()
@@ -17,20 +15,22 @@ const props = defineProps<{
   top: 0;
   bottom: 0;
   width: 3px;
-  cursor: col-resize;
   background: var(--vscode-scrollbarSlider-hoverBackground);
   opacity: 0.6;
-  z-index: 1;
+  z-index: 2;
+  cursor: col-resize;
   transition: background-color 0.1s ease;
 }
 
 .resize-handle:hover {
   background: var(--vscode-activityBar-activeBorder);
   opacity: 0.8;
+  cursor: col-resize;
 }
 
 .resize-handle.active {
   background: var(--vscode-activityBar-activeBorder);
   opacity: 1;
+  cursor: col-resize;
 }
 </style>

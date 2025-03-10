@@ -120,7 +120,7 @@
     "pack": "vsce package",
     "test": "vitest",
     "typecheck": "tsc --noEmit",
-    "release": "bumpp && nr publish"
+    "release": "nr prepare && bumpp && nr publish"
   },
   "dependencies": {
     "simple-git": "^3.27.0",

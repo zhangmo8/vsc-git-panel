@@ -27,6 +27,7 @@ const loadingTriggerRef = ref<HTMLElement | null>(null)
 
 const columnWidths = ref({
   branch: 120,
+  branchName: 140, // 新增: 分支名和标签列
   hash: 80,
   message: 200,
   stats: 140,
@@ -44,6 +45,31 @@ const commitData = computed(() => {
 const visibleCommits = computed(() => {
   const end = currentPage.value * ITEMS_PER_PAGE
   return commitData.value.slice(0, end)
+})
+
+// 计算所有活跃分支
+const activeBranches = computed(() => {
+  const branches = new Set<string>()
+
+  // 收集所有图表数据中的分支信息
+  props.graphData.forEach((operation) => {
+    // 当前分支
+    if (operation.branch) {
+      branches.add(operation.branch)
+    }
+
+    // 目标分支
+    if (operation.targetBranch) {
+      branches.add(operation.targetBranch)
+    }
+
+    // 源分支列表
+    if (operation.sourceBranches && operation.sourceBranches.length) {
+      operation.sourceBranches.forEach(branch => branches.add(branch))
+    }
+  })
+
+  return Array.from(branches)
 })
 
 function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
@@ -147,14 +173,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="git-graph" @mouseleave="handleMouseUp" @mouseup="handleMouseUp">
+  <div :class="{ dragging: isDragging }" class="git-graph" @mouseleave="handleMouseUp" @mouseup="handleMouseUp">
     <ul class="commit-list">
       <ColumnHeader v-model="columnWidths" />
       <ListItem
-        v-for="(commit, index) in visibleCommits" :key="commit.hash" :graph-data="graphData[index]"
-        :prev-graph-data="index > 0 ? graphData[index - 1] : null"
-        :next-graph-data="index < graphData.length - 1 ? graphData[index + 1] : null" :commit="commit"
-        :column-widths="columnWidths" :is-selected="selectedCommitHashes.includes(commit.hash)" :class="{
+        v-for="(commit, index) in visibleCommits" :key="commit.hash" :commit="commit"
+        :graph-data="graphData[index]" :column-widths="columnWidths"
+        :active-branches="activeBranches"
+        :is-selected="selectedCommitHashes.includes(commit.hash)" :class="{
           'being-dragged': isDragging && selectionStart !== null
             && ((index >= selectionStart && index <= dragEndIndex)
               || (index <= selectionStart && index >= dragEndIndex)),
@@ -178,6 +204,10 @@ onUnmounted(() => {
   font-family: var(--vscode-editor-font-family);
   user-select: none;
   /* Prevent text selection during drag */
+}
+
+.dragging {
+  cursor: col-resize;
 }
 
 .commit-list {

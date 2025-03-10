@@ -62,7 +62,12 @@ const transformedCommits = computed(() => {
       <input v-model="filter" type="text" placeholder="Search commits..." class="search-input">
     </div> -->
 
-    <CommitTable v-model="selectedCommitHashes" :commits="transformedCommits" :graph-data="commits?.operations || []" class="git-graph-container" />
+    <CommitTable 
+      v-model="selectedCommitHashes" 
+      :commits="transformedCommits" 
+      :graph-data="commits?.operations || []" 
+      class="git-graph-container" 
+    />
 
     <div v-if="error" class="error">
       {{ error }}

@@ -5,6 +5,10 @@ import type { Uri } from 'vscode'
 
 import { displayName } from './generated/meta'
 
+const branchColorCache = new Map<string, string>()
+let colorCounter = 0
+const goldenRatio = 0.618033988749895
+
 export const logger = useLogger(displayName)
 
 export async function getGitPath() {
@@ -48,4 +52,33 @@ export function parseGitStatus(status: string): { type: string, similarity?: num
     }
   }
   return { type: status }
+}
+
+/**
+ * @param branchName
+ * @returns HSL color string
+ */
+export function getBranchColor(branchName: string): string {
+  if (branchColorCache.has(branchName)) {
+    return branchColorCache.get(branchName)!
+  }
+
+  let hash = 0
+  for (let i = 0; i < branchName.length; i++) {
+    hash = branchName.charCodeAt(i) + ((hash << 5) - hash)
+  }
+
+  const baseHue = Math.abs(hash) % 360
+
+  const hue = (baseHue + colorCounter * goldenRatio * 360) % 360
+  colorCounter++
+
+  const saturation = 75
+  const lightness = 50
+
+  const color = `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`
+
+  branchColorCache.set(branchName, color)
+
+  return color
 }

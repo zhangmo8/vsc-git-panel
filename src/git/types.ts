@@ -26,11 +26,14 @@ export interface BaseOperation {
   hash: string
   message: string
   branchChanged: boolean
+  branchColor?: string
 }
 
 export interface CommitOperation extends BaseOperation {
   sourceBranches?: string[]
   targetBranch?: string
+  sourceBranchColors?: Record<string, string>
+  targetBranchColor?: string
 }
 
 export type GitOperation = CommitOperation
