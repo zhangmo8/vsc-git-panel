@@ -69,6 +69,30 @@ const activeBranches = computed(() => {
     }
   })
 
+  // 收集所有提交中的分支引用信息
+  props.commits.forEach(commit => {
+    if (commit.refs) {
+      const refsList = commit.refs.split(',').map(ref => ref.trim())
+      
+      refsList.forEach(ref => {
+        // 处理各种分支格式
+        if (!ref.includes('tag:') && !ref.includes('refs/tags/')) {
+          let branchName = ref
+          
+          // 清理分支名称
+          if (ref.includes('refs/heads/')) {
+            branchName = ref.replace('refs/heads/', '')
+          }
+          else if (ref.includes('refs/remotes/')) {
+            branchName = ref.replace('refs/remotes/', '')
+          }
+          
+          branches.add(branchName)
+        }
+      })
+    }
+  })
+
   return Array.from(branches)
 })
 

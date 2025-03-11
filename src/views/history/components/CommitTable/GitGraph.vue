@@ -8,6 +8,8 @@ const props = defineProps<{
   activeBranches?: string[]
   // 是否被选中
   isSelected?: boolean
+  // 标记哪些分支不应该向上延伸
+  branchEndingUp?: string[]
 }>()
 
 // SVG宽度将根据分支数量动态计算
@@ -53,8 +55,18 @@ function getBranchColorFromData(branchName: string): string {
     return props.graphData.sourceBranchColors[branchName]
   }
   
-  // 如果没有找到预处理的颜色，返回默认颜色
-  return '#888888'
+  // 生成一个基于分支名的稳定颜色
+  // 使用分支名作为唯一标识符来生成一个稳定的哈希值
+  let hash = 0;
+  for (let i = 0; i < branchName.length; i++) {
+    hash = ((hash << 5) - hash) + branchName.charCodeAt(i);
+    hash = hash & hash; // 转换为32位整数
+  }
+  
+  // 使用哈希值选择一个颜色
+  // 黄金比例法生成分散均匀的颜色
+  const hue = (hash % 360 + 360) % 360; // 确保是正数
+  return `hsl(${hue}, 70%, 45%)`; // 使用 HSL 颜色格式
 }
 
 // 计算当前提交涉及的所有分支
@@ -95,10 +107,10 @@ const allBranches = computed(() => {
       <g v-if="graphData">
         <!-- 第1层: 先绘制所有活跃分支的竖线 -->
         <template v-for="(branch, index) in allBranches" :key="`branch-${index}`">
-          <!-- 垂直分支线 - 贯穿整个图表 -->
+          <!-- 垂直分支线 - 如果是最后一个提交则不向上延伸 -->
           <line
             :x1="getBranchPosition(branch)"
-            y1="0"
+            :y1="props.branchEndingUp?.includes(branch) ? SVG_HEIGHT / 2 : 0"
             :x2="getBranchPosition(branch)"
             :y2="SVG_HEIGHT"
             :stroke="getBranchColorFromData(branch)"
