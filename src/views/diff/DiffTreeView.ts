@@ -8,12 +8,10 @@ import { useFileTreeView } from './FileTreeView'
 import type { CommitDetails } from './types'
 
 import { useGitService } from '@/git'
-import { useStorage } from '@/storage'
 import { EXTENSION_SYMBOL } from '@/constant'
 
 export const useDiffTreeView = createSingletonComposable(() => {
   const git = useGitService()
-  const storage = useStorage()
   const fileTree = useFileTreeView()
   const selectedCommitHashes = ref<string[]>([])
   const commitDetailsList = ref<CommitDetails[]>([])
@@ -32,20 +30,10 @@ export const useDiffTreeView = createSingletonComposable(() => {
       let totalFiles = 0
 
       for (const hash of hashes) {
-        let commit = storage.getCommit(hash)
-
-        if (!commit) {
-          const { logResult, operations, branches } = await git.getHistory()
-          const historyCommit = logResult.all.find(c => c.hash === hash)
-          if (!historyCommit)
-            continue
-
-          commit = {
-            ...historyCommit,
-          }
-
-          storage.saveCommits({ operations, branches, logResult })
-        }
+        // 直接根据 commit hash 查询，而不是查询全部历史后 find
+        const commit = await git.getCommitByHash(hash)
+        if (!commit)
+          continue
 
         commitList.push(commit)
 

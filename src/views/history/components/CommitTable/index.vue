@@ -11,6 +11,8 @@ import { WEBVIEW_CHANNEL } from '@/constant'
 const props = defineProps<{
   commits: Commit[]
   graphData: GitOperation[]
+  hasMoreData?: boolean
+  onLoadMore?: () => void
 }>()
 
 // Selected commit hash state
@@ -20,8 +22,6 @@ const isDragging = ref(false)
 const selectionStart = ref<number | null>(null)
 const dragEndIndex = ref<number>(0)
 
-const ITEMS_PER_PAGE = 45
-const currentPage = ref(1)
 const observer = ref<IntersectionObserver | null>(null)
 const loadingTriggerRef = ref<HTMLElement | null>(null)
 
@@ -43,8 +43,7 @@ const commitData = computed(() => {
 })
 
 const visibleCommits = computed(() => {
-  const end = currentPage.value * ITEMS_PER_PAGE
-  return commitData.value.slice(0, end)
+  return commitData.value
 })
 
 // 计算所有活跃分支
@@ -70,15 +69,15 @@ const activeBranches = computed(() => {
   })
 
   // 收集所有提交中的分支引用信息
-  props.commits.forEach(commit => {
+  props.commits.forEach((commit) => {
     if (commit.refs) {
       const refsList = commit.refs.split(',').map(ref => ref.trim())
-      
-      refsList.forEach(ref => {
+
+      refsList.forEach((ref) => {
         // 处理各种分支格式
         if (!ref.includes('tag:') && !ref.includes('refs/tags/')) {
           let branchName = ref
-          
+
           // 清理分支名称
           if (ref.includes('refs/heads/')) {
             branchName = ref.replace('refs/heads/', '')
@@ -86,7 +85,7 @@ const activeBranches = computed(() => {
           else if (ref.includes('refs/remotes/')) {
             branchName = ref.replace('refs/remotes/', '')
           }
-          
+
           branches.add(branchName)
         }
       })
@@ -179,8 +178,8 @@ function handleMouseUp() {
 onMounted(() => {
   observer.value = new IntersectionObserver((entries) => {
     const target = entries[0]
-    if (target.isIntersecting && currentPage.value * ITEMS_PER_PAGE < commitData.value.length) {
-      currentPage.value++
+    if (target.isIntersecting && props.hasMoreData && props.onLoadMore) {
+      props.onLoadMore()
     }
   })
 
@@ -213,7 +212,7 @@ onUnmounted(() => {
         @mouseover="() => isDragging && handleMouseOver(index)"
       />
       <li ref="loadingTriggerRef" class="loading-trigger">
-        <div v-if="visibleCommits.length < commitData.length" class="loading-text">
+        <div v-if="hasMoreData" class="loading-text">
           Loading more commits...
         </div>
       </li>
@@ -245,7 +244,6 @@ onUnmounted(() => {
 }
 
 .loading-trigger {
-  padding: 8px;
   text-align: center;
 }
 

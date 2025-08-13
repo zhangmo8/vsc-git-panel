@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import CopyButton from '../CopyButton/index.vue'
-import GitGraph from './GitGraph.vue'
+// import GitGraph from './GitGraph.vue'
 
 import { WEBVIEW_CHANNEL } from '@/constant'
 
@@ -20,8 +20,9 @@ const emit = defineEmits(['select'])
 const hoveredCell = ref<string | null>(null)
 
 function getBranchColorFromGraphData(branchName: string): string {
-  if (!props.graphData) return '#888888'
-  
+  if (!props.graphData)
+    return '#888888'
+
   // 检查当前提交的主分支颜色
   if (props.graphData.branch === branchName && props.graphData.branchColor) {
     return props.graphData.branchColor
@@ -39,16 +40,16 @@ function getBranchColorFromGraphData(branchName: string): string {
 
   // 生成一个基于分支名的稳定颜色
   // 使用分支名作为唯一标识符来生成一个稳定的哈希值
-  let hash = 0;
+  let hash = 0
   for (let i = 0; i < branchName.length; i++) {
-    hash = ((hash << 5) - hash) + branchName.charCodeAt(i);
-    hash = hash & hash; // 转换为32位整数
+    hash = ((hash << 5) - hash) + branchName.charCodeAt(i)
+    hash = hash & hash // 转换为32位整数
   }
-  
+
   // 使用哈希值选择一个颜色
   // 黄金比例法生成分散均匀的颜色
-  const hue = (hash % 360 + 360) % 360; // 确保是正数
-  return `hsl(${hue}, 70%, 45%)`; // 使用 HSL 颜色格式
+  const hue = (hash % 360 + 360) % 360 // 确保是正数
+  return `hsl(${hue}, 70%, 45%)` // 使用 HSL 颜色格式
 }
 
 // 解析Git引用字符串为数组
@@ -118,31 +119,32 @@ function handleDoubleClick() {
 }
 
 // 计算在当前提交处结束（不应向上延伸）的分支
-const branchEndingUp = computed(() => {
-  if (!props.graphData) return []
-  
-  const endingBranches = []
-  
-  // 当前提交的相关分支
-  if (props.graphData.branch) {
-    // 当前分支如果没有父提交，则结束于此
-    if (!props.commit.parents || props.commit.parents.length === 0) {
-      endingBranches.push(props.graphData.branch)
-    }
-  }
-  
-  // 源分支在此结束
-  if (props.graphData.sourceBranches && props.graphData.sourceBranches.length) {
-    props.graphData.sourceBranches.forEach(branch => {
-      // 如果源分支不等于主分支，则在此结束
-      if (branch !== props.graphData.branch) {
-        endingBranches.push(branch)
-      }
-    })
-  }
-  
-  return endingBranches
-})
+// const branchEndingUp = computed(() => {
+//   if (!props.graphData)
+//     return []
+
+//   const endingBranches = []
+
+//   // 当前提交的相关分支
+//   if (props.graphData.branch) {
+//     // 当前分支如果没有父提交，则结束于此
+//     if (!props.commit.parents || props.commit.parents.length === 0) {
+//       endingBranches.push(props.graphData.branch)
+//     }
+//   }
+
+//   // 源分支在此结束
+//   if (props.graphData.sourceBranches && props.graphData.sourceBranches.length) {
+//     props.graphData.sourceBranches.forEach((branch) => {
+//       // 如果源分支不等于主分支，则在此结束
+//       if (branch !== props.graphData.branch) {
+//         endingBranches.push(branch)
+//       }
+//     })
+//   }
+
+//   return endingBranches
+// })
 </script>
 
 <template>
@@ -160,10 +162,10 @@ const branchEndingUp = computed(() => {
             <span
               class="ref-item"
               :class="{ tag: ref.isTag, branch: !ref.isTag }"
-              :style="{ 
+              :style="{
                 backgroundColor: !ref.isTag ? `${getBranchColorFromGraphData(ref.name)}20` : undefined,
-                color: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined, 
-                borderColor: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined 
+                color: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined,
+                borderColor: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined,
               }"
             >
               {{ ref.displayName }}
@@ -172,14 +174,14 @@ const branchEndingUp = computed(() => {
         </div>
       </template>
     </div>
-    <div class="branch-col commit-cell" :style="{ width: `${columnWidths.branch}px` }">
-      <GitGraph 
-        :graph-data="graphData" 
-        :active-branches="activeBranches" 
+    <!-- <div class="branch-col commit-cell" :style="{ width: `${columnWidths.branch}px` }">
+      <GitGraph
+        :graph-data="graphData"
+        :active-branches="activeBranches"
         :is-selected="isSelected"
         :branch-ending-up="branchEndingUp"
       />
-    </div>
+    </div> -->
     <span
       class="hash-col commit-cell" :style="{ width: `${columnWidths.hash}px` }" @mouseenter="hoveredCell = 'hash'"
       @mouseleave="hoveredCell = null"
@@ -245,8 +247,12 @@ const branchEndingUp = computed(() => {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 8px;
+  padding: 0px 8px;
   position: relative;
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
 }
 
 .branch-col {

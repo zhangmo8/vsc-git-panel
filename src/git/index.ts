@@ -2,7 +2,7 @@ import simpleGit from 'simple-git'
 import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
-import type { Commit, CommitGraph, ExtendedLogResult, GitOperation } from './types'
+import type { Commit, CommitGraph, ExtendedLogResult, GitHistoryFilter, GitOperation } from './types'
 import { getBranchColor, logger } from '@/utils'
 
 export * from './types'
@@ -19,18 +19,67 @@ export const useGitService = createSingletonComposable(() => {
     maxConcurrentProcesses: 10,
   })
 
-  async function getHistory(): Promise<CommitGraph> {
+  async function getHistory(filter?: GitHistoryFilter): Promise<CommitGraph> {
     try {
-      const logResult = await git.log([
-        '--all',
-        '--stat',
-      ]) as ExtendedLogResult
+      // 构建基础分支参数（方案1：统一筛选参数）
+      const branchArgs: string[] = []
+      if (filter?.branches && filter.branches.length > 0) {
+        // 使用特定分支
+        filter.branches.forEach((branch) => {
+          branchArgs.push(branch)
+        })
+      }
+      else {
+        // 使用所有分支
+        branchArgs.push('--all')
+      }
 
-      const rawParentsOutput = await git.raw([
-        'log',
-        '--all',
-        '--pretty=format:%H %P',
-      ])
+      // 构建 git log 参数（添加 --stat 获取文件变更统计）
+      const logArgs = [...branchArgs, '--stat']
+
+      // 分页处理：每页45条数据
+      const pageSize = filter?.pageSize || 45
+      const page = filter?.page || 1
+      const skip = (page - 1) * pageSize
+
+      if (skip > 0) {
+        logArgs.push(`--skip=${skip}`)
+      }
+      logArgs.push(`--max-count=${pageSize}`)
+
+      // 添加搜索参数（方案3：优化 grep 参数）
+      if (filter?.search) {
+        const search = filter.search.trim()
+        if (search) {
+          // 支持 commit message 和 commit sha 搜索
+          if (search.length >= 7 && /^[a-f0-9]+$/i.test(search)) {
+            // 如果看起来像 commit hash，直接搜索
+            logArgs.push(`--grep=${search}`, '--regexp-ignore-case')
+          }
+          else {
+            // 否则只搜索 commit message
+            logArgs.push(`--grep=${search}`, '--regexp-ignore-case')
+          }
+        }
+      }
+
+      // 构建父子关系查询参数（方案1：使用相同的分支筛选）
+      // 注意：父子关系查询需要获取更多数据以确保关系完整性
+      const parentArgs = ['log', '--pretty=format:%H %P', ...branchArgs]
+
+      // 对于父子关系，我们需要获取足够的数据来建立完整的关系图
+      // 这里获取当前页面数据的两倍范围，确保关系完整
+      const extendedCount = Math.max(pageSize * 2, 200)
+      const extendedSkip = Math.max(skip - pageSize, 0)
+
+      if (extendedSkip > 0) {
+        parentArgs.push(`--skip=${extendedSkip}`)
+      }
+      parentArgs.push(`--max-count=${extendedCount}`)
+
+      const logResult = await git.log(logArgs) as ExtendedLogResult
+
+      const rawParentsOutput = await git.raw(parentArgs)
 
       const parentMap: { [hash: string]: string[] } = {}
       rawParentsOutput.split('\n').forEach((line) => {
@@ -254,6 +303,28 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  async function getCommitByHash(commitHash: string): Promise<Commit | null> {
+    try {
+      // 直接查询指定的 commit
+      const logResult = await git.log(['--stat', commitHash, '-1']) as ExtendedLogResult
+
+      if (logResult.all.length === 0) {
+        return null
+      }
+
+      const commit = logResult.all[0]
+      const { author_email, author_name } = commit
+      commit.authorEmail = author_email
+      commit.authorName = author_name
+
+      return commit
+    }
+    catch (error) {
+      logger.error('Error getting commit by hash:', error)
+      return null
+    }
+  }
+
   async function getPreviousCommit(commitHash: string): Promise<string | null> {
     try {
       const result = await git.raw(['rev-list', '--parents', '-n', '1', commitHash])
@@ -270,6 +341,7 @@ export const useGitService = createSingletonComposable(() => {
     git,
     rootRepoPath,
     getHistory,
+    getCommitByHash,
     getPreviousCommit,
     generateCommitGraph,
   }

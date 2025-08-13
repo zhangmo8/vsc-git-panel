@@ -3,12 +3,10 @@ import { createSingletonComposable, ref } from 'reactive-vscode'
 import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
 import { type CommitFile, useGitService } from '@/git'
-import { useStorage } from '@/storage'
 import { parseGitStatus } from '@/utils'
 
 export const useFileTreeView = createSingletonComposable(() => {
   const git = useGitService()
-  const storage = useStorage()
 
   function buildFileTree(files: CommitFile[], commitHash: string): TreeViewNode[] {
     const root = new Map<string, TreeViewNode>()
@@ -93,15 +91,7 @@ export const useFileTreeView = createSingletonComposable(() => {
       return { files: [], total: 0 }
 
     try {
-      const commit = storage.getCommit(commitHash)
-
-      if (commit?.files) {
-        return {
-          files: buildFileTree(commit.files, commit?.hash),
-          total: commit.files.length,
-        }
-      }
-
+      // 直接从Git获取文件信息
       const showResult = await git.git.show([
         '--name-status',
         '--pretty=format:',

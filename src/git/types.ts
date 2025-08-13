@@ -43,3 +43,10 @@ export interface CommitGraph {
   operations: GitOperation[]
   branches: string[]
 }
+
+export interface GitHistoryFilter {
+  search?: string
+  branches?: string[]
+  page?: number
+  pageSize?: number
+}

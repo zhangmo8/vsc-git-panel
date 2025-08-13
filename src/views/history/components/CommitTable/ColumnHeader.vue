@@ -72,10 +72,10 @@ function handleDragEnd() {
       Branch/Tag
       <ResizeHandle :is-active="currentColumn === 'branchName'" @mousedown="handleDragStart($event, 'branchName')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue?.branch}px` }">
+    <!-- <span class="column-header" :style="{ width: `${modelValue?.branch}px` }">
       Graph
       <ResizeHandle :is-active="currentColumn === 'branch'" @mousedown="handleDragStart($event, 'branch')" />
-    </span>
+    </span> -->
     <span class="hash-col column-header" :style="{ width: `${modelValue?.hash}px` }">
       CommitId
       <ResizeHandle :is-active="currentColumn === 'hash'" @mousedown="handleDragStart($event, 'hash')" />

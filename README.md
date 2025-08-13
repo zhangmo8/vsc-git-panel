@@ -9,6 +9,11 @@
 <a href="https://marketplace.visualstudio.com/items?itemName=zhangmo8.git-panel" target="__blank"><img src="https://img.shields.io/visual-studio-marketplace/v/zhangmo8.git-panel.svg?color=eee&amp;label=VS%20Code%20Marketplace&logo=visual-studio-code" alt="Visual Studio Marketplace Version" /></a>
 <a href="https://kermanx.github.io/reactive-vscode/" target="__blank"><img src="https://img.shields.io/badge/made_with-reactive--vscode-%23007ACC?style=flat&labelColor=%23229863"  alt="Made with reactive-vscode" /></a>
 
+## 📚 Documentation
+
+- [**技术栈与开发指南**](./TECH_STACK.md) - 详细的技术栈说明、架构设计和开发规范
+- [**Copilot 配置文档**](./.copilot-context.md) - 为 AI 助手提供的项目上下文信息
+
 ## Configurations
 
 <!-- configs -->

@@ -1,5 +1,5 @@
 import type { Webview } from 'vscode'
-import { ExtensionMode, Uri } from 'vscode'
+import { ExtensionMode, Uri, workspace } from 'vscode'
 import {
   computed,
   extensionContext as context,
@@ -8,15 +8,16 @@ import {
   ref,
   toRaw,
   useWebviewView,
+  watchEffect,
 } from 'reactive-vscode'
 
 import { useDiffTreeView } from './diff/DiffTreeView'
 
 import { useGitService } from '@/git'
-import { useStorage } from '@/storage'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
+import { logger } from '@/utils'
 
-import type { CommitGraph } from '@/git'
+import type { CommitGraph, GitHistoryFilter } from '@/git'
 
 function getNonce() {
   let text = ''
@@ -28,7 +29,6 @@ function getNonce() {
 
 export const useGitPanelView = createSingletonComposable(() => {
   const git = useGitService()
-  const storage = useStorage()
 
   const extensionUri = Uri.file(__dirname)
 
@@ -37,7 +37,15 @@ export const useGitPanelView = createSingletonComposable(() => {
   }
 
   const gitChangesProvider = useDiffTreeView()
-  const commits = ref<CommitGraph>(storage.getCommits())
+  const commits = ref<CommitGraph>({
+    operations: [],
+    branches: [],
+    logResult: {
+      all: [],
+      total: 0,
+      latest: null,
+    },
+  })
 
   const isDev = context.value?.extensionMode === ExtensionMode.Development
 
@@ -98,7 +106,7 @@ export const useGitPanelView = createSingletonComposable(() => {
       onDidReceiveMessage: async (message) => {
         switch (message.command) {
           case WEBVIEW_CHANNEL.GET_HISTORY:
-            await refreshHistory(message.forceRefresh)
+            await refreshHistory(message.forceRefresh, message.filter)
             break
 
           case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
@@ -117,29 +125,23 @@ export const useGitPanelView = createSingletonComposable(() => {
           case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
             await executeCommand('git-panel.changes.focus')
             break
-
-          case WEBVIEW_CHANNEL.CLEAR_HISTORY:
-            storage.clearCommits()
-            break
         }
       },
     },
   )
 
-  async function refreshHistory(forceRefresh: boolean = false) {
+  async function refreshHistory(_forceRefresh: boolean = false, filter?: GitHistoryFilter) {
     try {
-      if (commits.value.logResult.total === 0 || forceRefresh) {
-        const { logResult, operations, branches } = await git.getHistory()
-        commits.value = {
-          logResult: {
-            all: Array.from(logResult.all),
-            total: logResult.total,
-            latest: null,
-          },
-          operations,
-          branches,
-        }
-        storage.saveCommits(toRaw({ operations, branches, logResult }))
+      // 直接从Git获取数据，不使用缓存
+      const { logResult, operations, branches } = await git.getHistory(filter)
+      commits.value = {
+        logResult: {
+          all: Array.from(logResult.all),
+          total: logResult.total,
+          latest: null,
+        },
+        operations,
+        branches,
       }
 
       postMessage({
