@@ -25,21 +25,15 @@ export const useDiffTreeView = createSingletonComposable(() => {
         return null
       }
 
-      const commitList: CommitDetails[] = []
       const allCommitFiles: Map<string, { files: TreeViewNode[], total: number }> = new Map()
       let totalFiles = 0
 
-      for (const hash of hashes) {
-        // 直接根据 commit hash 查询，而不是查询全部历史后 find
-        const commit = await git.getCommitByHash(hash)
-        if (!commit)
-          continue
+      const commitList: CommitDetails[] = await git.getCommitByHash(hashes)
 
-        commitList.push(commit)
+      for (const commit of commitList) {
+        const { files: commitFiles, total } = await fileTree.getChildren(commit.hash)
 
-        const { files: commitFiles, total } = await fileTree.getChildren(hash)
-
-        allCommitFiles.set(hash, { files: commitFiles, total })
+        allCommitFiles.set(commit.hash, { files: commitFiles, total })
         totalFiles += total
       }
 

@@ -303,25 +303,48 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
-  async function getCommitByHash(commitHash: string): Promise<Commit | null> {
+  async function getCommitByHash(commitHashes: string[]): Promise<Commit[]> {
     try {
-      // 直接查询指定的 commit
-      const logResult = await git.log(['--stat', commitHash, '-1']) as ExtendedLogResult
-
-      if (logResult.all.length === 0) {
-        return null
+      if (commitHashes.length === 0) {
+        return []
       }
 
-      const commit = logResult.all[0]
-      const { author_email, author_name } = commit
-      commit.authorEmail = author_email
-      commit.authorName = author_name
+      // 构建查询参数，查询多个 commit
+      const logArgs = ['--stat']
+      commitHashes.forEach((hash) => {
+        logArgs.push(hash)
+      })
+      logArgs.push(`-${commitHashes.length}`)
 
-      return commit
+      const logResult = await git.log(logArgs) as ExtendedLogResult
+
+      if (logResult.all.length === 0) {
+        return []
+      }
+
+      // 处理查询结果
+      const commits = logResult.all.map((commit) => {
+        const { author_email, author_name } = commit
+        commit.authorEmail = author_email
+        commit.authorName = author_name
+        return commit
+      })
+
+      // 按照输入的 hash 顺序排序结果
+      const hashToCommit = new Map<string, Commit>()
+      commits.forEach((commit) => {
+        hashToCommit.set(commit.hash, commit)
+      })
+
+      const orderedCommits = commitHashes
+        .map(hash => hashToCommit.get(hash))
+        .filter((commit): commit is Commit => commit !== undefined)
+
+      return orderedCommits
     }
     catch (error) {
       logger.error('Error getting commit by hash:', error)
-      return null
+      return []
     }
   }
 
