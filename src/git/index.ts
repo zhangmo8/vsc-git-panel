@@ -72,7 +72,28 @@ export const useGitService = createSingletonComposable(() => {
         logArgs.push(`--max-count=${pageSize}`)
       }
 
-      const logResult = await git.log(logArgs) as ExtendedLogResult
+      let logResult: ExtendedLogResult
+      try {
+        logResult = await git.log(logArgs) as ExtendedLogResult
+      }
+      catch (error: any) {
+        // 检查是否为 sha 不存在的错误
+        const msg = String(error?.message || error)
+        if (msg.includes('bad revision') || msg.includes('unknown revision') || msg.includes('fatal:')) {
+          // 返回空结果，避免 loading 卡死
+          return {
+            operations: [],
+            branches: [],
+            logResult: {
+              all: [],
+              total: 0,
+              latest: null,
+            } as ExtendedLogResult,
+          }
+        }
+        logger.error('Error getting git history:', error)
+        throw error
+      }
 
       // 简化的提交处理
       const branchSet = new Set<string>()

@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 
 import CommitTable from './components/CommitTable/index.vue'
+import Empty from './components/Empty.vue'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
@@ -89,18 +90,16 @@ function clearFilter() {
   applyFilter(true)
 }
 
-// 加载更多数据（无限滚动）
 function loadMoreData() {
   if (isLoading.value || !hasMoreData.value)
     return
 
   currentPage.value++
-  applyFilter(false) // 不重置页面，加载下一页
+  applyFilter(false)
 }
 
-// 监听分支选择变化（保留分支选择的实时更新）
-watch(selectedBranch, () => {
-  applyFilter(true) // 分支变化时重置页面
+watch(() => selectedBranch.value, () => {
+  applyFilter(true)
 })
 
 // Handle messages from extension
@@ -213,14 +212,19 @@ const hasActiveFilter = computed(() => {
       </div>
     </div>
 
-    <CommitTable
-      v-model="selectedCommitHashes"
-      :commits="transformedCommits"
-      :graph-data="commits?.operations || []"
-      :has-more-data="hasMoreData"
-      :on-load-more="loadMoreData"
-      class="git-graph-container"
-    />
+    <template v-if="!isLoading && transformedCommits.length === 0">
+      <Empty class="git-graph-container" />
+    </template>
+    <template v-else>
+      <CommitTable
+        v-model="selectedCommitHashes"
+        :commits="transformedCommits"
+        :graph-data="commits?.operations || []"
+        :has-more-data="hasMoreData"
+        :on-load-more="loadMoreData"
+        class="git-graph-container"
+      />
+    </template>
 
     <div v-if="error" class="error">
       {{ error }}

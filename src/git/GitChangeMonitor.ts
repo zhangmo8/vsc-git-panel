@@ -16,7 +16,6 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
 
   fsWatcher.onDidChange(onGitChange)
   fsWatcher.onDidCreate(onGitChange)
-  fsWatcher.onDidDelete(onGitChange)
 
   async function getGetInstance() {
     try {
