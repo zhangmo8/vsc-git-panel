@@ -21,6 +21,7 @@ interface State {
 
 const commits = ref<CommitGraph>()
 const error = ref<string>('')
+
 const searchText = ref<string>('')
 const selectedBranch = ref<string>('') // 改为单选分支
 const isLoading = ref<boolean>(false)
@@ -28,7 +29,7 @@ const currentPage = ref<number>(1)
 const pageSize = ref<number>(45)
 const allCommits = ref<Commit[]>([]) // 累积所有已加载的提交
 const hasMoreData = ref<boolean>(true) // 是否还有更多数据
-
+const availableBranches = ref<string[]>([]) // 可用分支
 // VSCode webview API
 const vscode = acquireVsCodeApi<State>()
 window.vscode = vscode
@@ -47,12 +48,12 @@ function applyFilter(resetPage: boolean = true) {
     filter.branches = [selectedBranch.value]
   }
 
-  // 添加分页参数
   if (resetPage) {
     currentPage.value = 1
-    allCommits.value = [] // 重置累积数据
-    hasMoreData.value = true // 重置数据状态
+    allCommits.value = []
+    hasMoreData.value = true
   }
+
   filter.page = currentPage.value
   filter.pageSize = pageSize.value
 
@@ -84,10 +85,8 @@ function clearFilter() {
   allCommits.value = [] // 清空累积数据
   hasMoreData.value = true // 重置数据状态
   isLoading.value = true
-  vscode.postMessage({
-    command: WEBVIEW_CHANNEL.GET_HISTORY,
-    forceRefresh: true,
-  })
+
+  applyFilter(true)
 }
 
 // 加载更多数据（无限滚动）
@@ -112,19 +111,15 @@ window.addEventListener('message', (event: { data: any }) => {
     case CHANNEL.HISTORY: {
       commits.value = message.commits as CommitGraph
 
-      // 处理累积数据逻辑
       const newCommits = commits.value?.logResult.all || []
 
       if (currentPage.value === 1) {
-        // 第一页或重新搜索，替换所有数据
         allCommits.value = [...newCommits]
       }
       else {
-        // 后续页面，追加数据
         allCommits.value = [...allCommits.value, ...newCommits]
       }
 
-      // 检查是否还有更多数据
       hasMoreData.value = newCommits.length === pageSize.value
 
       isLoading.value = false // 停止加载状态
@@ -132,6 +127,9 @@ window.addEventListener('message', (event: { data: any }) => {
     }
     case CHANNEL.CLEAR_SELECTED:
       selectedCommitHashes.value = []
+      break
+    case CHANNEL.BRANCHES:
+      availableBranches.value = message.branches || []
       break
     case 'error':
       error.value = message.message
@@ -141,16 +139,12 @@ window.addEventListener('message', (event: { data: any }) => {
 })
 
 onMounted(() => {
-  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_HISTORY })
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_ALL_BRANCHES })
+  applyFilter(true)
 })
 
 const transformedCommits = computed(() => {
   return Array.from(allCommits.value || []) || []
-})
-
-// 获取所有可用分支
-const availableBranches = computed(() => {
-  return commits.value?.branches || []
 })
 
 // 计算筛选状态

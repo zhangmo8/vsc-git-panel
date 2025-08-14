@@ -1,6 +1,7 @@
 // webview to vscode channel
 export const WEBVIEW_CHANNEL = {
   GET_HISTORY: 'get-history',
+  GET_ALL_BRANCHES: 'get-all-branches',
   SHOW_COMMIT_DETAILS: 'show-commit-details',
   SHOW_CHANGES_PANEL: 'show-changes-panel',
 } as const
@@ -8,6 +9,7 @@ export const WEBVIEW_CHANNEL = {
 // vscode to webview channel
 export const CHANNEL = {
   HISTORY: 'history',
+  BRANCHES: 'branches',
   CLEAR_SELECTED: 'clear-selected',
 }
 

@@ -109,6 +109,10 @@ export const useGitPanelView = createSingletonComposable(() => {
             await refreshHistory(message.forceRefresh, message.filter)
             break
 
+          case WEBVIEW_CHANNEL.GET_ALL_BRANCHES:
+            await getRepoBranches()
+            break
+
           case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
             try {
               const hashes: string[] = JSON.parse(message.commitHashes)
@@ -157,6 +161,23 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  async function getRepoBranches() {
+    try {
+      const branches = await git.getAllBranches()
+
+      postMessage({
+        command: CHANNEL.BRANCHES,
+        branches,
+      })
+    }
+    catch (error) {
+      postMessage({
+        command: 'Failed to get git branches',
+        message: `${error}`,
+      })
+    }
+  }
+
   function clearSelection() {
     postMessage({ command: CHANNEL.CLEAR_SELECTED })
     gitChangesProvider.clearSelection()
@@ -167,6 +188,7 @@ export const useGitPanelView = createSingletonComposable(() => {
     refreshHistory,
     postMessage,
     forceRefresh,
+    getRepoBranches,
     clearSelection,
   }
 })

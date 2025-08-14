@@ -7,9 +7,10 @@ import { WEBVIEW_CHANNEL } from '@/constant'
 
 import type { Commit, GitOperation } from '@/git'
 
-const props = defineProps<{
+// graphData: GitOperation
+// const props =
+defineProps<{
   commit: Commit
-  graphData: GitOperation
   columnWidths: Record<string, number>
   isSelected?: boolean
   activeBranches?: string[]
@@ -19,87 +20,87 @@ const emit = defineEmits(['select'])
 
 const hoveredCell = ref<string | null>(null)
 
-function getBranchColorFromGraphData(branchName: string): string {
-  if (!props.graphData)
-    return '#888888'
+// function getBranchColorFromGraphData(branchName: string): string {
+//   if (!props.graphData)
+//     return '#888888'
 
-  // 检查当前提交的主分支颜色
-  if (props.graphData.branch === branchName && props.graphData.branchColor) {
-    return props.graphData.branchColor
-  }
+//   // 检查当前提交的主分支颜色
+//   if (props.graphData.branch === branchName && props.graphData.branchColor) {
+//     return props.graphData.branchColor
+//   }
 
-  // 检查目标分支颜色
-  if (props.graphData.targetBranch === branchName && props.graphData.targetBranchColor) {
-    return props.graphData.targetBranchColor
-  }
+//   // 检查目标分支颜色
+//   if (props.graphData.targetBranch === branchName && props.graphData.targetBranchColor) {
+//     return props.graphData.targetBranchColor
+//   }
 
-  // 检查源分支颜色
-  if (props.graphData.sourceBranchColors && props.graphData.sourceBranchColors[branchName]) {
-    return props.graphData.sourceBranchColors[branchName]
-  }
+//   // 检查源分支颜色
+//   if (props.graphData.sourceBranchColors && props.graphData.sourceBranchColors[branchName]) {
+//     return props.graphData.sourceBranchColors[branchName]
+//   }
 
-  // 生成一个基于分支名的稳定颜色
-  // 使用分支名作为唯一标识符来生成一个稳定的哈希值
-  let hash = 0
-  for (let i = 0; i < branchName.length; i++) {
-    hash = ((hash << 5) - hash) + branchName.charCodeAt(i)
-    hash = hash & hash // 转换为32位整数
-  }
+//   // 生成一个基于分支名的稳定颜色
+//   // 使用分支名作为唯一标识符来生成一个稳定的哈希值
+//   let hash = 0
+//   for (let i = 0; i < branchName.length; i++) {
+//     hash = ((hash << 5) - hash) + branchName.charCodeAt(i)
+//     hash = hash & hash // 转换为32位整数
+//   }
 
-  // 使用哈希值选择一个颜色
-  // 黄金比例法生成分散均匀的颜色
-  const hue = (hash % 360 + 360) % 360 // 确保是正数
-  return `hsl(${hue}, 70%, 45%)` // 使用 HSL 颜色格式
-}
+//   // 使用哈希值选择一个颜色
+//   // 黄金比例法生成分散均匀的颜色
+//   const hue = (hash % 360 + 360) % 360 // 确保是正数
+//   return `hsl(${hue}, 70%, 45%)` // 使用 HSL 颜色格式
+// }
 
 // 解析Git引用字符串为数组
-function getRefsArray(refsString: string) {
-  if (!refsString)
-    return []
+// function getRefsArray(refsString: string) {
+//   if (!refsString)
+//     return []
 
-  // 将引用字符串分割成数组
-  const refs = refsString.split(',').map(ref => ref.trim())
+//   // 将引用字符串分割成数组
+//   const refs = refsString.split(',').map(ref => ref.trim())
 
-  return refs.map((ref) => {
-    // 判断是标签还是分支
-    const isTag = ref.includes('tag:') || ref.includes('refs/tags/')
-    let name = ref
-    let displayName = ref
+//   return refs.map((ref) => {
+//     // 判断是标签还是分支
+//     const isTag = ref.includes('tag:') || ref.includes('refs/tags/')
+//     let name = ref
+//     let displayName = ref
 
-    // 清理显示名称
-    if (ref.includes('refs/heads/')) {
-      // 本地分支
-      name = ref.replace('refs/heads/', '')
-      displayName = name
-    }
-    else if (ref.includes('refs/remotes/')) {
-      // 远程分支
-      name = ref.replace('refs/remotes/', '')
-      displayName = name
-    }
-    else if (ref.includes('tag:')) {
-      // 标签格式1
-      name = ref.replace('tag:', '')
-      displayName = name
-    }
-    else if (ref.includes('refs/tags/')) {
-      // 标签格式2
-      name = ref.replace('refs/tags/', '')
-      displayName = name
-    }
-    else if (ref === 'HEAD') {
-      name = 'HEAD'
-      displayName = 'HEAD'
-    }
+//     // 清理显示名称
+//     if (ref.includes('refs/heads/')) {
+//       // 本地分支
+//       name = ref.replace('refs/heads/', '')
+//       displayName = name
+//     }
+//     else if (ref.includes('refs/remotes/')) {
+//       // 远程分支
+//       name = ref.replace('refs/remotes/', '')
+//       displayName = name
+//     }
+//     else if (ref.includes('tag:')) {
+//       // 标签格式1
+//       name = ref.replace('tag:', '')
+//       displayName = name
+//     }
+//     else if (ref.includes('refs/tags/')) {
+//       // 标签格式2
+//       name = ref.replace('refs/tags/', '')
+//       displayName = name
+//     }
+//     else if (ref === 'HEAD') {
+//       name = 'HEAD'
+//       displayName = 'HEAD'
+//     }
 
-    return {
-      raw: ref,
-      name,
-      displayName,
-      isTag,
-    }
-  })
-}
+//     return {
+//       raw: ref,
+//       name,
+//       displayName,
+//       isTag,
+//     }
+//   })
+// }
 
 function handleCommitClick(event: MouseEvent) {
   emit('select', event)
@@ -154,18 +155,17 @@ function handleDoubleClick() {
     @click="handleCommitClick"
     @dblclick="handleDoubleClick"
   >
-    <div class="branch-name-col commit-cell" :style="{ width: `${columnWidths.branchName}px` }">
-      <!-- 显示分支和标签 -->
+    <!-- <div class="branch-name-col commit-cell" :style="{ width: `${columnWidths.branchName}px` }">
       <template v-if="commit.refs && commit.refs !== ''">
         <div class="refs-container">
-          <template v-for="(ref, index) in getRefsArray(commit.refs)" :key="index">
+          <template v-for="ref in getRefsArray(commit.refs)" :key="ref">
             <span
               class="ref-item"
               :class="{ tag: ref.isTag, branch: !ref.isTag }"
               :style="{
-                backgroundColor: !ref.isTag ? `${getBranchColorFromGraphData(ref.name)}20` : undefined,
-                color: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined,
-                borderColor: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined,
+                // backgroundColor: !ref.isTag ? `${getBranchColorFromGraphData(ref.name)}20` : undefined,
+                // color: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined,
+                // borderColor: !ref.isTag ? getBranchColorFromGraphData(ref.name) : undefined,
               }"
             >
               {{ ref.displayName }}
@@ -173,7 +173,7 @@ function handleDoubleClick() {
           </template>
         </div>
       </template>
-    </div>
+    </div> -->
     <!-- <div class="branch-col commit-cell" :style="{ width: `${columnWidths.branch}px` }">
       <GitGraph
         :graph-data="graphData"
@@ -251,8 +251,7 @@ function handleDoubleClick() {
   position: relative;
   width: 100%;
   height: 32px;
-  display: flex;
-  align-items: center;
+  line-height: 32px;
 }
 
 .branch-col {
@@ -288,7 +287,6 @@ function handleDoubleClick() {
 
 .branch-name-col {
   white-space: normal;
-  overflow: visible;
   padding: 0px;
 }
 

@@ -10,7 +10,7 @@ import { WEBVIEW_CHANNEL } from '@/constant'
 
 const props = defineProps<{
   commits: Commit[]
-  graphData: GitOperation[]
+  // graphData: GitOperation[]
   hasMoreData?: boolean
   onLoadMore?: () => void
 }>()
@@ -42,70 +42,67 @@ const commitData = computed(() => {
   }))
 })
 
-const visibleCommits = computed(() => {
-  return commitData.value
-})
-
 // 计算所有活跃分支
 const activeBranches = computed(() => {
-  const branches = new Set<string>()
+  // const branches = new Set<string>()
 
-  // 收集所有图表数据中的分支信息
-  props.graphData.forEach((operation) => {
-    // 当前分支
-    if (operation.branch) {
-      branches.add(operation.branch)
-    }
+  return []
+  // // 收集所有图表数据中的分支信息
+  // props.graphData.forEach((operation) => {
+  //   // 当前分支
+  //   if (operation.branch) {
+  //     branches.add(operation.branch)
+  //   }
 
-    // 目标分支
-    if (operation.targetBranch) {
-      branches.add(operation.targetBranch)
-    }
+  //   // 目标分支
+  //   if (operation.targetBranch) {
+  //     branches.add(operation.targetBranch)
+  //   }
 
-    // 源分支列表
-    if (operation.sourceBranches && operation.sourceBranches.length) {
-      operation.sourceBranches.forEach(branch => branches.add(branch))
-    }
-  })
+  //   // 源分支列表
+  //   if (operation.sourceBranches && operation.sourceBranches.length) {
+  //     operation.sourceBranches.forEach(branch => branches.add(branch))
+  //   }
+  // })
 
-  // 收集所有提交中的分支引用信息
-  props.commits.forEach((commit) => {
-    if (commit.refs) {
-      const refsList = commit.refs.split(',').map(ref => ref.trim())
+  // // 收集所有提交中的分支引用信息
+  // props.commits.forEach((commit) => {
+  //   if (commit.refs) {
+  //     const refsList = commit.refs.split(',').map(ref => ref.trim())
 
-      refsList.forEach((ref) => {
-        // 处理各种分支格式
-        if (!ref.includes('tag:') && !ref.includes('refs/tags/')) {
-          let branchName = ref
+  //     refsList.forEach((ref) => {
+  //       // 处理各种分支格式
+  //       if (!ref.includes('tag:') && !ref.includes('refs/tags/')) {
+  //         let branchName = ref
 
-          // 清理分支名称
-          if (ref.includes('refs/heads/')) {
-            branchName = ref.replace('refs/heads/', '')
-          }
-          else if (ref.includes('refs/remotes/')) {
-            branchName = ref.replace('refs/remotes/', '')
-          }
+  //         // 清理分支名称
+  //         if (ref.includes('refs/heads/')) {
+  //           branchName = ref.replace('refs/heads/', '')
+  //         }
+  //         else if (ref.includes('refs/remotes/')) {
+  //           branchName = ref.replace('refs/remotes/', '')
+  //         }
 
-          branches.add(branchName)
-        }
-      })
-    }
-  })
+  //         branches.add(branchName)
+  //       }
+  //     })
+  //   }
+  // })
 
-  return Array.from(branches)
+  // return Array.from(branches)
 })
 
 function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
   isDragging.value = true
 
   if (event.shiftKey && selectedCommitHashes.value.length > 0) {
-    const lastSelectedIndex = visibleCommits.value.findIndex(
+    const lastSelectedIndex = commitData.value.findIndex(
       commit => commit.hash === selectedCommitHashes.value[selectedCommitHashes.value.length - 1],
     )
     if (lastSelectedIndex !== -1) {
       const startIdx = Math.min(lastSelectedIndex, index)
       const endIdx = Math.max(lastSelectedIndex, index)
-      const hashesToSelect = visibleCommits.value
+      const hashesToSelect = commitData.value
         .slice(startIdx, endIdx + 1)
         .map(commit => commit.hash)
 
@@ -138,7 +135,7 @@ function handleMouseDown(index: number, event: MouseEvent) {
     isDragging.value = true
     selectionStart.value = index
     dragEndIndex.value = index
-    selectedCommitHashes.value = [visibleCommits.value[index].hash]
+    selectedCommitHashes.value = [commitData.value[index].hash]
   }
 }
 
@@ -146,7 +143,7 @@ function handleMouseOver(index: number) {
   if (isDragging.value && selectionStart.value !== null) {
     const startIdx = Math.min(selectionStart.value, index)
     const endIdx = Math.max(selectionStart.value, index)
-    const hashesToSelect = visibleCommits.value
+    const hashesToSelect = commitData.value
       .slice(startIdx, endIdx + 1)
       .map(commit => commit.hash)
 
@@ -195,13 +192,15 @@ onUnmounted(() => {
 })
 </script>
 
+<!-- :graph-data="graphData[index]"  -->
 <template>
   <div :class="{ dragging: isDragging }" class="git-graph" @mouseleave="handleMouseUp" @mouseup="handleMouseUp">
     <ul class="commit-list">
       <ColumnHeader v-model="columnWidths" />
       <ListItem
-        v-for="(commit, index) in visibleCommits" :key="commit.hash" :commit="commit"
-        :graph-data="graphData[index]" :column-widths="columnWidths"
+        v-for="(commit, index) in commitData" :key="commit.hash" :commit="commit"
+
+        :column-widths="columnWidths"
         :active-branches="activeBranches"
         :is-selected="selectedCommitHashes.includes(commit.hash)" :class="{
           'being-dragged': isDragging && selectionStart !== null

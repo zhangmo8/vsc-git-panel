@@ -7,12 +7,13 @@ export default defineConfig({
   ],
   format: ['cjs'],
   shims: true,
+  splitting: true,
   dts: false,
   external: [
     'vscode',
   ],
   noExternal: [
-    'simple-git'
+    'simple-git',
   ],
   esbuildOptions(options) {
     options.alias = {
