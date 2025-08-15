@@ -47,6 +47,7 @@ export interface CommitGraph {
 export interface GitHistoryFilter {
   search?: string
   branches?: string[]
+  author?: string
   page?: number
   pageSize?: number
 }

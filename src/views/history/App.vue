@@ -25,12 +25,14 @@ const error = ref<string>('')
 
 const searchText = ref<string>('')
 const selectedBranch = ref<string>('') // 改为单选分支
+const selectedAuthor = ref<string>('') // 作者筛选
 const isLoading = ref<boolean>(false)
 const currentPage = ref<number>(1)
 const pageSize = ref<number>(45)
 const allCommits = ref<Commit[]>([]) // 累积所有已加载的提交
 const hasMoreData = ref<boolean>(true) // 是否还有更多数据
 const availableBranches = ref<string[]>([]) // 可用分支
+const availableAuthors = ref<string[]>([]) // 可用作者
 // VSCode webview API
 const vscode = acquireVsCodeApi<State>()
 window.vscode = vscode
@@ -47,6 +49,10 @@ function applyFilter(resetPage: boolean = true) {
 
   if (selectedBranch.value) {
     filter.branches = [selectedBranch.value]
+  }
+
+  if (selectedAuthor.value) {
+    filter.author = selectedAuthor.value
   }
 
   if (resetPage) {
@@ -82,6 +88,7 @@ function handleSearchKeyup(event: KeyboardEvent) {
 function clearFilter() {
   searchText.value = ''
   selectedBranch.value = ''
+  selectedAuthor.value = ''
   currentPage.value = 1 // 重置页面
   allCommits.value = [] // 清空累积数据
   hasMoreData.value = true // 重置数据状态
@@ -99,6 +106,10 @@ function loadMoreData() {
 }
 
 watch(() => selectedBranch.value, () => {
+  applyFilter(true)
+})
+
+watch(() => selectedAuthor.value, () => {
   applyFilter(true)
 })
 
@@ -130,6 +141,9 @@ window.addEventListener('message', (event: { data: any }) => {
     case CHANNEL.BRANCHES:
       availableBranches.value = message.branches || []
       break
+    case CHANNEL.AUTHORS:
+      availableAuthors.value = message.authors || []
+      break
     case 'error':
       error.value = message.message
       isLoading.value = false // 出错时也停止加载状态
@@ -139,6 +153,7 @@ window.addEventListener('message', (event: { data: any }) => {
 
 onMounted(() => {
   vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_ALL_BRANCHES })
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_ALL_AUTHORS })
   applyFilter(true)
 })
 
@@ -148,7 +163,7 @@ const transformedCommits = computed(() => {
 
 // 计算筛选状态
 const hasActiveFilter = computed(() => {
-  return searchText.value.trim() || selectedBranch.value
+  return searchText.value.trim() || selectedBranch.value || selectedAuthor.value
 })
 </script>
 
@@ -198,6 +213,22 @@ const hasActiveFilter = computed(() => {
             :value="branch"
           >
             {{ branch }}
+          </option>
+        </select>
+        <select
+          v-model="selectedAuthor"
+          class="author-select"
+          :disabled="isLoading"
+        >
+          <option value="">
+            所有作者
+          </option>
+          <option
+            v-for="author in availableAuthors"
+            :key="author"
+            :value="author"
+          >
+            {{ author }}
           </option>
         </select>
         <button
@@ -314,7 +345,8 @@ const hasActiveFilter = computed(() => {
   justify-content: center;
 }
 
-.branch-select {
+.branch-select,
+.author-select {
   min-width: 120px;
   padding: 4px 8px;
   border: 1px solid var(--vscode-input-border);
@@ -326,11 +358,13 @@ const hasActiveFilter = computed(() => {
   transition: border-color 0.2s ease;
 }
 
-.branch-select:focus {
+.branch-select:focus,
+.author-select:focus {
   border-color: var(--vscode-focusBorder);
 }
 
-.branch-select:disabled {
+.branch-select:disabled,
+.author-select:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }

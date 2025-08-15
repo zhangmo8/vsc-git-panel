@@ -30,6 +30,20 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  // 获取所有作者
+  async function getAllAuthors(): Promise<string[]> {
+    try {
+      // 使用 git log --format="%an <%ae>" 获取所有作者
+      const result = await git.raw(['log', '--format=%an <%ae>'])
+      const authors = Array.from(new Set(result.split('\n').map(line => line.trim()).filter(Boolean)))
+      return authors
+    }
+    catch (error) {
+      logger.error('Failed to get all authors:', error)
+      return []
+    }
+  }
+
   async function getHistory(filter?: GitHistoryFilter): Promise<CommitGraph> {
     try {
       const search = filter?.search?.trim()
@@ -49,6 +63,11 @@ export const useGitService = createSingletonComposable(() => {
 
       // 构建 git log 参数（添加 --stat 获取文件变更统计）
       const logArgs = [...branchArgs, '--stat']
+
+      // 支持作者筛选
+      if (filter?.author) {
+        logArgs.push(`--author=${filter.author}`)
+      }
 
       // 分页处理：每页45条数据
       const pageSize = filter?.pageSize || 45
@@ -230,6 +249,7 @@ export const useGitService = createSingletonComposable(() => {
     getHistory,
     getCommitByHash,
     getAllBranches,
+    getAllAuthors,
     getPreviousCommit,
   }
 })

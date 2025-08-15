@@ -113,6 +113,10 @@ export const useGitPanelView = createSingletonComposable(() => {
             await getRepoBranches()
             break
 
+          case WEBVIEW_CHANNEL.GET_ALL_AUTHORS:
+            await getRepoAuthors()
+            break
+
           case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
             try {
               const hashes: string[] = JSON.parse(message.commitHashes)
@@ -178,6 +182,23 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  async function getRepoAuthors() {
+    try {
+      const authors = await git.getAllAuthors()
+
+      postMessage({
+        command: CHANNEL.AUTHORS,
+        authors,
+      })
+    }
+    catch (error) {
+      postMessage({
+        command: 'Failed to get git authors',
+        message: `${error}`,
+      })
+    }
+  }
+
   function clearSelection() {
     postMessage({ command: CHANNEL.CLEAR_SELECTED })
     gitChangesProvider.clearSelection()
@@ -189,6 +210,7 @@ export const useGitPanelView = createSingletonComposable(() => {
     postMessage,
     forceRefresh,
     getRepoBranches,
+    getRepoAuthors,
     clearSelection,
   }
 })
