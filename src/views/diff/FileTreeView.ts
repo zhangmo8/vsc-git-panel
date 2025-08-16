@@ -1,9 +1,12 @@
 import type { TreeViewNode } from 'reactive-vscode'
-import { createSingletonComposable, ref } from 'reactive-vscode'
+import { createSingletonComposable } from 'reactive-vscode'
+
 import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
+
 import { type CommitFile, useGitService } from '@/git'
 import { parseGitStatus } from '@/utils'
+import { GIT_STATUS } from '@/constant'
 
 export const useFileTreeView = createSingletonComposable(() => {
   const git = useGitService()
@@ -111,7 +114,7 @@ export const useFileTreeView = createSingletonComposable(() => {
           const [status, ...pathParts] = line.split('\t')
           const { type, similarity } = parseGitStatus(status)
 
-          if (type === 'R' && pathParts.length === 2) {
+          if (type === GIT_STATUS.RENAMED && pathParts.length === 2) {
             const [oldPath, newPath] = pathParts
             return {
               status: type,

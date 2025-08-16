@@ -347,7 +347,7 @@ const hasActiveFilter = computed(() => {
 
 .branch-select,
 .author-select {
-  min-width: 120px;
+  max-width: 180px;
   padding: 4px 8px;
   border: 1px solid var(--vscode-input-border);
   background-color: var(--vscode-input-background);

@@ -8,9 +8,6 @@ export class FileNode extends TreeItem {
     public readonly commitHash: string,
     public readonly oldPath?: string,
   ) {
-    const label = path.split('/').pop() || path
-    super(label, TreeItemCollapsibleState.None)
-
     // 为重命名的文件创建特殊的 URI
     const params = new URLSearchParams()
     params.set('status', status)
@@ -19,7 +16,7 @@ export class FileNode extends TreeItem {
     }
 
     const uri = Uri.parse(`${EXTENSION_SYMBOL}:${path}?${params.toString()}`)
-    this.resourceUri = uri
+    super(uri, TreeItemCollapsibleState.None)
 
     this.tooltip = oldPath
       ? `${status} ${oldPath} → ${path}`
