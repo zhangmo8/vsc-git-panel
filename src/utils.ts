@@ -1,9 +1,9 @@
+import type { Uri } from 'vscode'
 import { useLogger } from 'reactive-vscode'
 import { extensions } from 'vscode'
 
-import type { Uri } from 'vscode'
-
 import { displayName } from './generated/meta'
+import type { GIT_STATUS } from './constant'
 
 const branchColorCache = new Map<string, string>()
 let colorCounter = 0
@@ -43,15 +43,15 @@ export function toGitUri(uri: Uri, ref: string): Uri {
   })
 }
 
-export function parseGitStatus(status: string): { type: string, similarity?: number } {
+export function parseGitStatus(status: string): { type: keyof typeof GIT_STATUS, similarity?: number } {
   const match = status.match(/^([A-Z])(\d+)?$/)
   if (match) {
     return {
-      type: match[1],
+      type: match[1] as keyof typeof GIT_STATUS,
       similarity: match[2] ? Number.parseInt(match[2], 10) : undefined,
     }
   }
-  return { type: status }
+  return { type: status as keyof typeof GIT_STATUS }
 }
 
 /**
@@ -81,4 +81,12 @@ export function getBranchColor(branchName: string): string {
   branchColorCache.set(branchName, color)
 
   return color
+}
+
+export function shortHash(hash: string): string {
+  return hash.substring(0, 7)
+}
+
+export function getFileNameByPath(path: string): string {
+  return path.split('/').pop() || ''
 }
