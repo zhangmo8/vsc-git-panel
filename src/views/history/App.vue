@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, toRaw, watch } from 'vue'
 
 import CommitTable from './components/CommitTable/index.vue'
 import Empty from './components/Empty.vue'
+
+import { getVscodeApi } from './utils'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
@@ -12,12 +14,6 @@ declare global {
   interface Window {
     vscode: WebviewApi<State>
   }
-}
-
-interface State {
-  commits: CommitGraph
-  selectedHash?: string
-  filter?: GitHistoryFilter
 }
 
 const commits = ref<CommitGraph>()
@@ -34,7 +30,7 @@ const hasMoreData = ref<boolean>(true) // 是否还有更多数据
 const availableBranches = ref<string[]>([]) // 可用分支
 const availableAuthors = ref<string[]>([]) // 可用作者
 // VSCode webview API
-const vscode = acquireVsCodeApi<State>()
+const vscode = getVscodeApi()
 window.vscode = vscode
 
 const selectedCommitHashes = ref<string[]>([])
@@ -121,13 +117,14 @@ window.addEventListener('message', (event: { data: any }) => {
     case CHANNEL.HISTORY: {
       commits.value = message.commits as CommitGraph
 
-      const newCommits = commits.value?.logResult.all || []
+      const newCommits = toRaw(commits.value?.logResult.all) || []
+      const _commits = toRaw(allCommits.value) || []
 
       if (currentPage.value === 1) {
         allCommits.value = [...newCommits]
       }
       else {
-        allCommits.value = [...allCommits.value, ...newCommits]
+        allCommits.value = [..._commits, ...newCommits]
       }
 
       hasMoreData.value = newCommits.length === pageSize.value
@@ -158,6 +155,8 @@ onMounted(() => {
 })
 
 const transformedCommits = computed(() => {
+  console.log('allCommits', allCommits.value)
+
   return Array.from(allCommits.value || []) || []
 })
 

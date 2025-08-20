@@ -2,7 +2,6 @@
   "recommendations": [
     "Vue.volar",
     "amodio.tsl-problem-matcher",
-    "emeraldwalk.runonsave",
-    "amodio.tsl-problem-matcher"
+    "emeraldwalk.runonsave"
   ]
 }

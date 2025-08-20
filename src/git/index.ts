@@ -3,7 +3,7 @@ import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
 import type { Commit, CommitGraph, ExtendedLogResult, GitHistoryFilter, GitOperation } from './types'
-import { getBranchColor, logger } from '@/utils'
+import { logger } from '@/utils'
 
 export * from './types'
 
@@ -61,39 +61,108 @@ export const useGitService = createSingletonComposable(() => {
         branchArgs.push('--all')
       }
 
-      // 构建 git log 参数（添加 --stat 获取文件变更统计）
-      const logArgs = [...branchArgs, '--stat']
-
-      // 支持作者筛选
+      // 自定义 log format，包含 parents 字段
+      const prettyFormat = '--pretty=format:%H%x01%P%x01%an%x01%ae%x01%ad%x01%s%x01%d%x01%b'
+      // 参数顺序：分支/--all/作者/分页/搜索... 最后加 --pretty --stat
+      const logArgs: string[] = [...branchArgs]
       if (filter?.author) {
         logArgs.push(`--author=${filter.author}`)
       }
-
-      // 分页处理：每页45条数据
       const pageSize = filter?.pageSize || 45
       const page = filter?.page || 1
       const skip = (page - 1) * pageSize
-
       if (skip > 0) {
         logArgs.push(`--skip=${skip}`)
       }
-
       if (search) {
         if (hashSearch) {
           logArgs.push('--max-count=1', search)
         }
         else {
-          // 否则搜索 commit message
           logArgs.push(`--max-count=${pageSize}`, `--grep=${search}`, '--regexp-ignore-case')
         }
       }
       else {
         logArgs.push(`--max-count=${pageSize}`)
       }
+      // 最后加 format 和 stat
+      logArgs.push(prettyFormat, '--stat')
 
       let logResult: ExtendedLogResult
       try {
-        logResult = await git.log(logArgs) as ExtendedLogResult
+        // 用 simple-git 的 raw 获取原始 log 输出，logArgs 前加 'log'
+        const rawLog = await git.raw(['log', ...logArgs])
+        // 先用 \n 分割，再聚合每个 commit 块
+        const lines = rawLog.split('\n')
+
+        const commitsRaw: string[] = []
+        let current = ''
+        for (const line of lines) {
+          const parts = line.split('\x01')
+          const isCommitStart = parts.length > 1 && /^[a-f0-9]{7,40}$/i.test(parts[0])
+          if (isCommitStart) {
+            if (current)
+              commitsRaw.push(current)
+            current = line
+          }
+          else {
+            current += (current ? '\n' : '') + line
+          }
+        }
+        if (current)
+          commitsRaw.push(current)
+        const all: Commit[] = []
+        for (const block of commitsRaw) {
+          if (!block.trim())
+            continue
+          const parts = block.split('\x01')
+          const [hash, parents, author_name, author_email, date, message, refs] = parts
+          const bodyAndStats = parts.slice(7).join('\x01')
+          let files: any[] = []
+          let summary = ''
+          let diff
+          if (bodyAndStats) {
+            const lines = bodyAndStats.split('\n')
+            // 文件明细
+            const statLines = lines.filter(l => /\s+[AMDCR]\s+/.test(l) || /^\s*[AMDCR]\s+/.test(l))
+            files = statLines.map((l) => {
+              const match = l.match(/([AMDCR])\s+(.+)/)
+              return match ? { status: match[1], path: match[2] } : null
+            }).filter(Boolean)
+            // 统计 summary 行
+            const summaryLine = lines.find(l => /files changed/.test(l))
+            if (summaryLine) {
+              summary = summaryLine.trim()
+              // 解析数字
+              const changed = Number.parseInt((summary.match(/(\d+) files? changed/) || [])[1] || '0', 10)
+              const insertions = Number.parseInt((summary.match(/(\d+) insertions?\(\+\)/) || [])[1] || '0', 10)
+              const deletions = Number.parseInt((summary.match(/(\d+) deletions?\(-\)/) || [])[1] || '0', 10)
+              diff = { changed, insertions, deletions }
+            }
+          }
+          const parentArr = parents ? parents.split(' ').filter(Boolean) : []
+          all.push({
+            hash,
+            parents: parentArr,
+            author_name,
+            author_email,
+            date,
+            message,
+            refs,
+            body: bodyAndStats?.split('\n')[0] || '',
+            files,
+            summary,
+            diff,
+            isMergeCommit: parentArr.length > 1,
+            authorName: author_name,
+            authorEmail: author_email,
+          } as Commit)
+        }
+        logResult = {
+          all,
+          total: all.length,
+          latest: all[0] || null,
+        } as ExtendedLogResult
       }
       catch (error: any) {
         // 检查是否为 sha 不存在的错误
@@ -118,13 +187,6 @@ export const useGitService = createSingletonComposable(() => {
       const branchSet = new Set<string>()
 
       for (const commit of logResult.all) {
-        const { author_email, author_name } = commit
-        commit.authorEmail = author_email
-        commit.authorName = author_name
-
-        // 简单的合并提交检测（通过消息判断）
-        commit.isMergeCommit = commit.message.toLowerCase().startsWith('merge ')
-
         // 提取分支信息
         if (commit.refs) {
           const refs = commit.refs.split(',').map(ref => ref.trim())
@@ -176,7 +238,6 @@ export const useGitService = createSingletonComposable(() => {
           hash: commit.hash,
           message: commit.message,
           branchChanged: false, // 简化：不计算分支变化
-          branchColor: getBranchColor(mainBranch),
         }
       })
 

@@ -5,11 +5,15 @@ import { extensions } from 'vscode'
 import { displayName } from './generated/meta'
 import type { GIT_STATUS } from './constant'
 
-const branchColorCache = new Map<string, string>()
-let colorCounter = 0
-const goldenRatio = 0.618033988749895
-
 export const logger = useLogger(displayName)
+
+let _vscode: WebviewApi<State>
+export function getVscodeApi() {
+  if (!_vscode) {
+    _vscode = acquireVsCodeApi()
+  }
+  return _vscode
+}
 
 export async function getGitPath() {
   try {
@@ -52,35 +56,6 @@ export function parseGitStatus(status: string): { type: keyof typeof GIT_STATUS,
     }
   }
   return { type: status as keyof typeof GIT_STATUS }
-}
-
-/**
- * @param branchName
- * @returns HSL color string
- */
-export function getBranchColor(branchName: string): string {
-  if (branchColorCache.has(branchName)) {
-    return branchColorCache.get(branchName)!
-  }
-
-  let hash = 0
-  for (let i = 0; i < branchName.length; i++) {
-    hash = branchName.charCodeAt(i) + ((hash << 5) - hash)
-  }
-
-  const baseHue = Math.abs(hash) % 360
-
-  const hue = (baseHue + colorCounter * goldenRatio * 360) % 360
-  colorCounter++
-
-  const saturation = 75
-  const lightness = 50
-
-  const color = `hsl(${Math.round(hue)}, ${saturation}%, ${lightness}%)`
-
-  branchColorCache.set(branchName, color)
-
-  return color
 }
 
 export function shortHash(hash: string): string {
