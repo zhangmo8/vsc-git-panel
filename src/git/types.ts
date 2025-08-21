@@ -15,6 +15,7 @@ export interface CommitFields extends DefaultLogFields {
   parents?: Array<string>
   children?: Array<string>
   isMergeCommit?: boolean
+  branchName?: string
 }
 
 export interface ExtendedLogResult extends LogResult<CommitFields> {

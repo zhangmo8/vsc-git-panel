@@ -61,9 +61,7 @@ export const useGitService = createSingletonComposable(() => {
         branchArgs.push('--all')
       }
 
-      // 自定义 log format，包含 parents 字段
       const prettyFormat = '--pretty=format:%H%x01%P%x01%an%x01%ae%x01%ad%x01%s%x01%d%x01%b'
-      // 参数顺序：分支/--all/作者/分页/搜索... 最后加 --pretty --stat
       const logArgs: string[] = [...branchArgs]
       if (filter?.author) {
         logArgs.push(`--author=${filter.author}`)
@@ -139,6 +137,23 @@ export const useGitService = createSingletonComposable(() => {
             }
           }
           const parentArr = parents ? parents.split(' ').filter(Boolean) : []
+
+          let branchName = ''
+          if (refs) {
+            const refsArr = refs.split(',').map(r => r.trim())
+            const branchRef = refsArr.find(ref =>
+              ref.includes('refs/heads/') || (!ref.includes('refs/') && !ref.includes('tag:')),
+            )
+            if (branchRef) {
+              branchName = branchRef.replace('refs/heads/', '')
+                .replace('refs/remotes/', '')
+                .replace('HEAD -> ', '')
+                .split('/')
+                .slice(1)
+                .join('/') || branchRef.replace('refs/heads/', '').replace('refs/remotes/', '').replace('HEAD -> ', '')
+            }
+          }
+
           all.push({
             hash,
             parents: parentArr,
@@ -154,6 +169,7 @@ export const useGitService = createSingletonComposable(() => {
             isMergeCommit: parentArr.length > 1,
             authorName: author_name,
             authorEmail: author_email,
+            branchName,
           } as Commit)
         }
         logResult = {
