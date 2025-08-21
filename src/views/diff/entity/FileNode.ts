@@ -8,7 +8,6 @@ export class FileNode extends TreeItem {
     public readonly commitHash: string,
     public readonly oldPath?: string,
   ) {
-    // 为重命名的文件创建特殊的 URI
     const params = new URLSearchParams()
     params.set('status', status)
     if (oldPath) {
@@ -19,8 +18,8 @@ export class FileNode extends TreeItem {
     super(uri, TreeItemCollapsibleState.None)
 
     this.tooltip = oldPath
-      ? `${status} ${oldPath} → ${path}`
-      : `${status} ${path}`
+      ? `${oldPath} → ${path}`
+      : `${path}`
 
     this.command = {
       command: `${EXTENSION_SYMBOL}.openDiff`,

@@ -90,9 +90,7 @@ export const useGitService = createSingletonComposable(() => {
 
       let logResult: ExtendedLogResult
       try {
-        // 用 simple-git 的 raw 获取原始 log 输出，logArgs 前加 'log'
         const rawLog = await git.raw(['log', ...logArgs])
-        // 先用 \n 分割，再聚合每个 commit 块
         const lines = rawLog.split('\n')
 
         const commitsRaw: string[] = []
@@ -130,7 +128,7 @@ export const useGitService = createSingletonComposable(() => {
               return match ? { status: match[1], path: match[2] } : null
             }).filter(Boolean)
             // 统计 summary 行
-            const summaryLine = lines.find(l => /files changed/.test(l))
+            const summaryLine = lines.find(l => /files? changed/.test(l))
             if (summaryLine) {
               summary = summaryLine.trim()
               // 解析数字
