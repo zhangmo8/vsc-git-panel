@@ -1,169 +1,134 @@
 <script setup lang="ts">
-import { computed } from 'vue'
-import type { CommitOperation } from '@/git'
-
 const props = defineProps<{
-  graphData?: CommitOperation
-  // 所有活跃分支的列表
-  activeBranches?: string[]
-  // 是否被选中
+  graph?: {
+    node: { x: number, color: string }
+    edges: { toX: number, color: string, type: 'straight' | 'merge' }[]
+    columns: (string | null)[]
+  }
   isSelected?: boolean
-  // 标记哪些分支不应该向上延伸
-  branchEndingUp?: string[]
+  hasBranchLabel?: boolean
 }>()
 
 // SVG宽度将根据分支数量动态计算
 const SVG_HEIGHT = 33
 // 图表配置
-const DOT_SIZE = 8
-const LINE_WIDTH = 2
-const HORIZONTAL_SPACING = 15
+const DOT_SIZE = 10
+const LINE_WIDTH = 3
+const HORIZONTAL_SPACING = 18
 
-// 不需要线条样式常量，所有类型都使用实线
-
-// 存储分支与其索引的映射关系
-const branchIndices = new Map<string, number>()
-let currentBranchIndex = 0
-
-// 计算水平位置 - 为每个新出现的分支分配一个唯一的水平位置
-function getBranchPosition(branchName: string) {
-  // 如果这个分支之前没有出现过，给它分配一个新的索引
-  if (!branchIndices.has(branchName)) {
-    branchIndices.set(branchName, currentBranchIndex++)
-  }
-
-  // 根据分支索引计算水平位置
-  return (branchIndices.get(branchName)! + 1) * HORIZONTAL_SPACING
+// 计算水平位置
+function getX(index: number) {
+  return (index + 1) * HORIZONTAL_SPACING
 }
 
-// 从graphData中获取分支颜色
-function getBranchColorFromData(branchName: string): string {
-  if (!props.graphData) return '#888888'
-  
-  // 检查当前提交的主分支颜色
-  if (props.graphData.branch === branchName && props.graphData.branchColor) {
-    return props.graphData.branchColor
-  }
-  
-  // 检查目标分支颜色
-  if (props.graphData.targetBranch === branchName && props.graphData.targetBranchColor) {
-    return props.graphData.targetBranchColor
-  }
-  
-  // 检查源分支颜色
-  if (props.graphData.sourceBranchColors && props.graphData.sourceBranchColors[branchName]) {
-    return props.graphData.sourceBranchColors[branchName]
-  }
-  
-  // 生成一个基于分支名的稳定颜色
-  // 使用分支名作为唯一标识符来生成一个稳定的哈希值
-  let hash = 0;
-  for (let i = 0; i < branchName.length; i++) {
-    hash = ((hash << 5) - hash) + branchName.charCodeAt(i);
-    hash = hash & hash; // 转换为32位整数
-  }
-  
-  // 使用哈希值选择一个颜色
-  // 黄金比例法生成分散均匀的颜色
-  const hue = (hash % 360 + 360) % 360; // 确保是正数
-  return `hsl(${hue}, 70%, 45%)`; // 使用 HSL 颜色格式
+function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
+  const dx = x2 - x1
+  const dy = y2 - y1
+  const radius = Math.min(Math.abs(dy) / 2, Math.abs(dx) / 2, 12)
+  const verticalGap = (Math.abs(dy) - 2 * radius) / 2
+
+  const xDir = dx > 0 ? 1 : -1
+  const sweep1 = dx > 0 ? 0 : 1
+  const sweep2 = dx > 0 ? 1 : 0
+
+  let d = `M ${x1} ${y1}`
+  d += ` L ${x1} ${y1 + verticalGap}`
+  d += ` A ${radius} ${radius} 0 0 ${sweep1} ${x1 + radius * xDir} ${y1 + verticalGap + radius}`
+  d += ` L ${x2 - radius * xDir} ${y1 + verticalGap + radius}`
+  d += ` A ${radius} ${radius} 0 0 ${sweep2} ${x2} ${y2 - verticalGap}`
+  d += ` L ${x2} ${y2}`
+
+  return d
 }
-
-// 计算当前提交涉及的所有分支
-const allBranches = computed(() => {
-  const branches = new Set<string>()
-
-  // 添加活跃分支列表中的所有分支
-  if (props.activeBranches && props.activeBranches.length) {
-    props.activeBranches.forEach(branch => branches.add(branch))
-  }
-
-  // 添加当前提交相关的分支
-  if (props.graphData) {
-    // 当前分支
-    if (props.graphData.branch) {
-      branches.add(props.graphData.branch)
-    }
-
-    // 目标分支
-    if (props.graphData.targetBranch) {
-      branches.add(props.graphData.targetBranch)
-    }
-
-    // 源分支列表
-    if (props.graphData.sourceBranches && props.graphData.sourceBranches.length) {
-      props.graphData.sourceBranches.forEach(branch => branches.add(branch))
-    }
-  }
-
-  return Array.from(branches)
-})
 </script>
 
 <template>
   <div class="git-graph">
-    <svg class="svg-wrapper" :width="(allBranches.length + 1) * HORIZONTAL_SPACING + HORIZONTAL_SPACING" :height="SVG_HEIGHT" xmlns="http://www.w3.org/2000/svg">
-      <!-- 绘制提交点和线条 -->
-      <g v-if="graphData">
-        <!-- 第1层: 先绘制所有活跃分支的竖线 -->
-        <template v-for="(branch, index) in allBranches" :key="`branch-${index}`">
-          <!-- 垂直分支线 - 如果是最后一个提交则不向上延伸 -->
-          <line
-            :x1="getBranchPosition(branch)"
-            :y1="props.branchEndingUp?.includes(branch) ? SVG_HEIGHT / 2 : 0"
-            :x2="getBranchPosition(branch)"
-            :y2="SVG_HEIGHT"
-            :stroke="getBranchColorFromData(branch)"
-            :stroke-width="LINE_WIDTH"
-            stroke-dasharray="none"
-            :stroke-opacity="isSelected ? 1 : 0.7"
-          />
-        </template>
+    <svg
+      v-if="props.graph"
+      class="svg-wrapper"
+      :width="(props.graph.columns.length + 1) * HORIZONTAL_SPACING + HORIZONTAL_SPACING"
+      :height="SVG_HEIGHT"
+      xmlns="http://www.w3.org/2000/svg"
+    >
+      <!-- 1. 绘制背景竖线 (直通线) -->
+      <template v-for="(color, index) in props.graph.columns" :key="`col-${index}`">
+        <line
+          v-if="color && index !== props.graph.node.x"
+          :x1="getX(index)"
+          :y1="0"
+          :x2="getX(index)"
+          :y2="SVG_HEIGHT"
+          :stroke="color"
+          :stroke-width="LINE_WIDTH"
+          :stroke-opacity="isSelected ? 1 : 0.5"
+        />
+      </template>
 
-        <!-- 第2层: 绘制合并线和分叉线 -->
-        <!-- 如果是合并提交，绘制合并线 -->
-        <template v-if="graphData.type === 'merge' && graphData.sourceBranches && graphData.sourceBranches.length">
-          <template v-for="(sourceBranch, index) in graphData.sourceBranches" :key="`merge-${index}`">
-            <!-- 只有当源分支与目标分支不同时才绘制合并线 -->
-            <path
-              v-if="sourceBranch !== graphData.branch"
-              :d="`M ${getBranchPosition(sourceBranch)} ${SVG_HEIGHT / 2} C ${getBranchPosition(sourceBranch) + HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.branch) - HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.branch)} ${SVG_HEIGHT / 2}`"
-              :stroke="getBranchColorFromData(sourceBranch)"
-              :stroke-width="LINE_WIDTH"
-              stroke-dasharray="none"
-              :stroke-opacity="isSelected ? 1 : 0.7"
-              fill="none"
-            />
-          </template>
-        </template>
+      <!-- 1.5 绘制来自左侧分支标签的连接线 -->
+      <line
+        v-if="hasBranchLabel"
+        :x1="0"
+        :y1="SVG_HEIGHT / 2"
+        :x2="getX(props.graph.node.x)"
+        :y2="SVG_HEIGHT / 2"
+        :stroke="props.graph.node.color"
+        :stroke-width="LINE_WIDTH"
+        :stroke-opacity="isSelected ? 1 : 0.5"
+      />
 
-        <!-- 如果分支发生变化，绘制分支分叉线 -->
-        <template v-if="graphData.branchChanged && graphData.targetBranch && graphData.targetBranch !== graphData.branch">
-          <path
-            :d="`M ${getBranchPosition(graphData.branch)} ${SVG_HEIGHT / 2} C ${getBranchPosition(graphData.branch) + HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.targetBranch) - HORIZONTAL_SPACING / 2} ${SVG_HEIGHT / 2}, ${getBranchPosition(graphData.targetBranch)} ${SVG_HEIGHT / 2}`"
-            :stroke="getBranchColorFromData(graphData.targetBranch)"
-            :stroke-width="LINE_WIDTH"
-            stroke-dasharray="none"
-            :stroke-opacity="isSelected ? 1 : 0.7"
-            fill="none"
-          />
-        </template>
+      <!-- 2. 绘制出射连线 (Edges) -->
+      <template v-for="(edge, i) in props.graph.edges" :key="`edge-${i}`">
+        <!-- 直线 -->
+        <line
+          v-if="edge.type === 'straight'"
+          :x1="getX(props.graph.node.x)"
+          :y1="SVG_HEIGHT / 2"
+          :x2="getX(edge.toX)"
+          :y2="SVG_HEIGHT"
+          :stroke="edge.color"
+          :stroke-width="LINE_WIDTH"
+          :stroke-opacity="isSelected ? 1 : 0.5"
+        />
+        <!-- 曲线 (Merge/Fork) -->
+        <path
+          v-else
+          :d="createCurvePath(getX(props.graph.node.x), SVG_HEIGHT / 2, getX(edge.toX), SVG_HEIGHT)"
+          :stroke="edge.color"
+          :stroke-width="LINE_WIDTH"
+          :stroke-opacity="isSelected ? 1 : 0.5"
+          fill="none"
+        />
+      </template>
 
-        <!-- 第3层: 最后绘制提交节点，确保在线的上面 -->
-        <template v-if="graphData.branch">
-          <!-- 提交节点 -->
-          <circle
-            :cx="getBranchPosition(graphData.branch)"
-            :cy="SVG_HEIGHT / 2"
-            :r="DOT_SIZE / 2"
-            :stroke="getBranchColorFromData(graphData.branch)"
-            :stroke-width="graphData.type === 'merge' ? 2 : 1"
-            :stroke-opacity="isSelected ? 1 : 0.8"
-            :fill="graphData.type === 'merge' ? 'white' : getBranchColorFromData(graphData.branch)"
-            :fill-opacity="isSelected ? 1 : 0.8"
-          />
-        </template>
-      </g>
+      <!-- 3. 绘制来自上方的连接线 (如果当前节点不是起始点) -->
+      <line
+        v-if="props.graph.columns[props.graph.node.x]"
+        :x1="getX(props.graph.node.x)"
+        :y1="0"
+        :x2="getX(props.graph.node.x)"
+        :y2="SVG_HEIGHT / 2"
+        :stroke="props.graph.node.color"
+        :stroke-width="LINE_WIDTH"
+        :stroke-opacity="isSelected ? 1 : 0.5"
+      />
+
+      <!-- 4. 绘制节点 -->
+      <!-- 外圈 (Halo) 用于遮挡线条 -->
+      <circle
+        :cx="getX(props.graph.node.x)"
+        :cy="SVG_HEIGHT / 2"
+        :r="DOT_SIZE / 2 + 2"
+        fill="var(--vscode-editor-background)"
+      />
+      <!-- 内圈 (实心点) -->
+      <circle
+        :cx="getX(props.graph.node.x)"
+        :cy="SVG_HEIGHT / 2"
+        :r="DOT_SIZE / 2"
+        :fill="props.graph.node.color"
+        :fill-opacity="isSelected ? 1 : 0.9"
+      />
     </svg>
   </div>
 </template>
@@ -172,13 +137,16 @@ const allBranches = computed(() => {
 .git-graph {
   width: 100%;
   padding: 0 8px;
-  overflow: auto;
+  overflow: visible; /* 允许 SVG 超出容器 */
   position: absolute;
   top: 0;
   left: 0;
+  height: 100%;
+  pointer-events: none; /* 让点击穿透到下面的行 */
 }
 
 .svg-wrapper {
   display: block;
+  overflow: visible;
 }
 </style>

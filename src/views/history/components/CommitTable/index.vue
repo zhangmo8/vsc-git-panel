@@ -10,7 +10,7 @@ import { WEBVIEW_CHANNEL } from '@/constant'
 
 const props = defineProps<{
   commits: Commit[]
-  // graphData: GitOperation[]
+  graphData: GitOperation[]
   hasMoreData?: boolean
   onLoadMore?: () => void
 }>()
@@ -42,55 +42,155 @@ const commitData = computed(() => {
   }))
 })
 
-// 计算所有活跃分支
-const activeBranches = computed(() => {
-  // const branches = new Set<string>()
+// 计算所有活跃分支和图表数据
+const processedRows = computed(() => {
+  const rows: {
+    commit: any
+    graph: {
+      node: { x: number, color: string }
+      edges: { toX: number, color: string, type: 'straight' | 'merge' }[]
+      columns: (string | null)[]
+    }
+  }[] = []
 
-  return []
-  // // 收集所有图表数据中的分支信息
-  // props.graphData.forEach((operation) => {
-  //   // 当前分支
-  //   if (operation.branch) {
-  //     branches.add(operation.branch)
-  //   }
+  const columns: ({ hash: string, color: string } | null)[] = []
+  const colors = [
+    '#0075ca', // Blue
+    '#1db35b', // Green
+    '#ffb900', // Yellow
+    '#e81123', // Red
+    '#8e44ad', // Purple
+    '#ff8c00', // Orange
+    '#00cc6a', // Teal
+    '#ea4c89', // Pink
+    '#00bcf2', // Light Blue
+    '#7f8c8d', // Grey
+    '#d35400', // Pumpkin
+    '#2c3e50', // Midnight Blue
+    '#f1c40f', // Sun Flower
+    '#c0392b', // Pomegranate
+    '#16a085', // Green Sea
+  ]
+  let colorIndex = 0
+  const getNextColor = () => {
+    const usedColors = new Set(columns.filter(c => c !== null).map(c => c!.color))
 
-  //   // 目标分支
-  //   if (operation.targetBranch) {
-  //     branches.add(operation.targetBranch)
-  //   }
+    // Try to find a color not in use
+    for (let i = 0; i < colors.length; i++) {
+      // We start checking from colorIndex to maintain some rotation even if colors are freed up
+      const idx = (colorIndex + i) % colors.length
+      if (!usedColors.has(colors[idx])) {
+        colorIndex = idx + 1 // Update index for next time
+        return colors[idx]
+      }
+    }
 
-  //   // 源分支列表
-  //   if (operation.sourceBranches && operation.sourceBranches.length) {
-  //     operation.sourceBranches.forEach(branch => branches.add(branch))
-  //   }
-  // })
+    // If all used, just return next in rotation
+    return colors[colorIndex++ % colors.length]
+  }
 
-  // // 收集所有提交中的分支引用信息
-  // props.commits.forEach((commit) => {
-  //   if (commit.refs) {
-  //     const refsList = commit.refs.split(',').map(ref => ref.trim())
+  for (const commit of commitData.value) {
+    // 1. 查找当前 commit 是否在追踪列中
+    let colIndex = columns.findIndex(c => c && c.hash === commit.hash)
+    let color
 
-  //     refsList.forEach((ref) => {
-  //       // 处理各种分支格式
-  //       if (!ref.includes('tag:') && !ref.includes('refs/tags/')) {
-  //         let branchName = ref
+    if (colIndex === -1) {
+      // 未追踪（新分支头），找第一个空闲列或追加
+      colIndex = columns.findIndex(c => c === null)
+      if (colIndex === -1) {
+        colIndex = columns.length
+        columns.push(null)
+      }
+      color = getNextColor()
+      columns[colIndex] = { hash: commit.hash, color }
+    }
+    else {
+      color = columns[colIndex]!.color
+    }
 
-  //         // 清理分支名称
-  //         if (ref.includes('refs/heads/')) {
-  //           branchName = ref.replace('refs/heads/', '')
-  //         }
-  //         else if (ref.includes('refs/remotes/')) {
-  //           branchName = ref.replace('refs/remotes/', '')
-  //         }
+    const node = { x: colIndex, color }
+    const edges: { toX: number, color: string, type: 'straight' | 'merge' }[] = []
 
-  //         branches.add(branchName)
-  //       }
-  //     })
-  //   }
-  // })
+    // 记录当前行的列状态（用于绘制背景线）
+    // 注意：这里我们需要深拷贝 columns 的颜色信息，因为 columns 会在下面被修改
+    const currentColumns = columns.map(c => c ? c.color : null)
 
-  // return Array.from(branches)
+    // 2. 决定下一行的列状态
+    const nextColumns = [...columns]
+    const parents = commit.parents || []
+
+    if (parents.length === 0) {
+      // 分支结束
+      nextColumns[colIndex] = null
+    }
+    else {
+      // Parent 0 继承当前列
+      const p0 = parents[0]
+
+      // 检查 p0 是否已经被其他列追踪（合并汇聚点）
+      // 注意：这里检查的是 nextColumns，因为我们在构建下一行的状态
+      const existingP0Index = nextColumns.findIndex(c => c && c.hash === p0)
+
+      if (existingP0Index !== -1 && existingP0Index !== colIndex) {
+        // P0 已经在其他列中（合并），当前列结束，连线到 P0 所在列
+        nextColumns[colIndex] = null
+        edges.push({ toX: existingP0Index, color, type: 'merge' })
+      }
+      else {
+        // P0 未被追踪，或者就在当前列，继续追踪
+        nextColumns[colIndex] = { hash: p0, color }
+        edges.push({ toX: colIndex, color, type: 'straight' })
+      }
+
+      // 处理其他 Parents (Merge Sources)
+      for (let i = 1; i < parents.length; i++) {
+        const p = parents[i]
+        let pIndex = nextColumns.findIndex(c => c && c.hash === p)
+
+        if (pIndex === -1) {
+          // 未追踪，分配新列
+          pIndex = nextColumns.findIndex(c => c === null)
+          if (pIndex === -1) {
+            pIndex = nextColumns.length
+            nextColumns.push(null)
+          }
+          const pColor = getNextColor()
+          nextColumns[pIndex] = { hash: p, color: pColor }
+        }
+
+        // 连线：从当前节点连向 parent 所在列
+        // 注意：这里的颜色通常使用 parent 的颜色，表示“来自那个分支”
+        edges.push({ toX: pIndex, color: nextColumns[pIndex]!.color, type: 'merge' })
+      }
+    }
+
+    rows.push({
+      commit,
+      graph: {
+        node,
+        edges,
+        columns: currentColumns,
+      },
+    })
+
+    // 更新 columns
+    // 更新 columns
+    while (nextColumns.length > 0 && nextColumns[nextColumns.length - 1] === null) {
+      nextColumns.pop()
+    }
+
+    // 替换 columns
+    columns.length = 0
+    nextColumns.forEach(c => columns.push(c))
+  }
+
+  return rows
 })
+
+// const activeBranches = computed(() => {
+//   // const branches = new Set<string>()
+//   return []
+// })
 
 function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
   isDragging.value = true
@@ -198,15 +298,18 @@ onUnmounted(() => {
     <ul class="commit-list">
       <ColumnHeader v-model="columnWidths" />
       <ListItem
-        v-for="(commit, index) in commitData" :key="commit.hash" :commit="commit"
-
+        v-for="(row, index) in processedRows"
+        :key="row.commit.hash"
+        :commit="row.commit"
+        :graph="row.graph"
         :column-widths="columnWidths"
-        :active-branches="activeBranches"
-        :is-selected="selectedCommitHashes.includes(commit.hash)" :class="{
+        :is-selected="selectedCommitHashes.includes(row.commit.hash)"
+        :class="{
           'being-dragged': isDragging && selectionStart !== null
             && ((index >= selectionStart && index <= dragEndIndex)
               || (index <= selectionStart && index >= dragEndIndex)),
-        }" @select="(event) => handleCommitSelected(commit.hash, index, event)"
+        }"
+        @select="(event) => handleCommitSelected(row.commit.hash, index, event)"
         @mousedown="(event: MouseEvent) => handleMouseDown(index, event)"
         @mouseover="() => isDragging && handleMouseOver(index)"
       />

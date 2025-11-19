@@ -8,7 +8,7 @@ import { getVscodeApi } from './utils'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, CommitGraph, GitHistoryFilter } from '@/git'
+import type { Commit, CommitGraph, GitHistoryFilter, GitOperation } from '@/git'
 
 declare global {
   interface Window {
@@ -26,6 +26,7 @@ const isLoading = ref<boolean>(false)
 const currentPage = ref<number>(1)
 const pageSize = ref<number>(45)
 const allCommits = ref<Commit[]>([]) // 累积所有已加载的提交
+const allOperations = ref<GitOperation[]>([]) // 累积所有已加载的操作
 const hasMoreData = ref<boolean>(true) // 是否还有更多数据
 const availableBranches = ref<string[]>([]) // 可用分支
 const availableAuthors = ref<string[]>([]) // 可用作者
@@ -118,13 +119,17 @@ window.addEventListener('message', (event: { data: any }) => {
       commits.value = message.commits as CommitGraph
 
       const newCommits = toRaw(commits.value?.logResult.all) || []
+      const newOperations = toRaw(commits.value?.operations) || []
       const _commits = toRaw(allCommits.value) || []
+      const _operations = toRaw(allOperations.value) || []
 
       if (currentPage.value === 1) {
         allCommits.value = [...newCommits]
+        allOperations.value = [...newOperations]
       }
       else {
         allCommits.value = [..._commits, ...newCommits]
+        allOperations.value = [..._operations, ...newOperations]
       }
 
       hasMoreData.value = newCommits.length === pageSize.value
@@ -155,8 +160,6 @@ onMounted(() => {
 })
 
 const transformedCommits = computed(() => {
-  console.log('allCommits', allCommits.value)
-
   return Array.from(allCommits.value || []) || []
 })
 
@@ -249,7 +252,7 @@ const hasActiveFilter = computed(() => {
       <CommitTable
         v-model="selectedCommitHashes"
         :commits="transformedCommits"
-        :graph-data="commits?.operations || []"
+        :graph-data="allOperations"
         :has-more-data="hasMoreData"
         :on-load-more="loadMoreData"
         class="git-graph-container"
