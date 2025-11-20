@@ -17,17 +17,21 @@
 ## Configurations
 
 <!-- configs -->
-<!-- empty -->
+
+**No data**
+
 <!-- configs -->
 
 ## Commands
 
 <!-- commands -->
+
 | Command                     | Title                     |
 | --------------------------- | ------------------------- |
 | `git-panel.history`         | GitPanel: History         |
 | `git-panel.history.clear`   | GitPanel: Clear Selection |
 | `git-panel.history.refresh` | GitPanel: Refresh History |
+
 <!-- commands -->
 
 ## License

@@ -34,8 +34,8 @@ export default defineConfig({
     cssCodeSplit: false,
     rollupOptions: {
       output: {
-        assetFileNames: 'views.css'
-      }
+        assetFileNames: 'views.css',
+      },
     },
     emptyOutDir: false,
     outDir: 'dist',

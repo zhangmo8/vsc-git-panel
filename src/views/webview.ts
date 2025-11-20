@@ -1,21 +1,18 @@
 import type { Webview } from 'vscode'
-import { ExtensionMode, Uri, workspace } from 'vscode'
+import { ExtensionMode, Uri } from 'vscode'
 import {
   computed,
   extensionContext as context,
   createSingletonComposable,
   executeCommand,
   ref,
-  toRaw,
   useWebviewView,
-  watchEffect,
 } from 'reactive-vscode'
 
 import { useDiffTreeView } from './diff/DiffTreeView'
 
 import { useGitService } from '@/git'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
-import { logger } from '@/utils'
 
 import type { CommitGraph, GitHistoryFilter } from '@/git'
 
@@ -46,6 +43,7 @@ export const useGitPanelView = createSingletonComposable(() => {
       latest: null,
     },
   })
+  const currentFilter = ref<GitHistoryFilter | undefined>(undefined)
 
   const isDev = context.value?.extensionMode === ExtensionMode.Development
 
@@ -106,6 +104,7 @@ export const useGitPanelView = createSingletonComposable(() => {
       onDidReceiveMessage: async (message) => {
         switch (message.command) {
           case WEBVIEW_CHANNEL.GET_HISTORY:
+            currentFilter.value = message.filter
             await refreshHistory(message.forceRefresh, message.filter)
             break
 
@@ -140,8 +139,10 @@ export const useGitPanelView = createSingletonComposable(() => {
 
   async function refreshHistory(_forceRefresh: boolean = false, filter?: GitHistoryFilter) {
     try {
+      const filterToUse = filter !== undefined ? filter : currentFilter.value
+
       // 直接从Git获取数据，不使用缓存
-      const { logResult, operations, branches } = await git.getHistory(filter)
+      const { logResult, operations, branches } = await git.getHistory(filterToUse)
       commits.value = {
         logResult: {
           all: Array.from(logResult.all),

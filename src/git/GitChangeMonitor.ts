@@ -7,9 +7,15 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
 
   const disposables = ref<Disposable[]>([])
   const retryCount = ref(0)
+  let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
   const onGitChange = () => {
-    webview.refreshHistory(true)
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+    }
+    debounceTimer = setTimeout(() => {
+      webview.refreshHistory(true)
+    }, 500)
   }
 
   const fsWatcher = useFsWatcher('**/.git/index')

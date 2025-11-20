@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { ref } from 'vue'
 import CopyButton from '../CopyButton/index.vue'
 import GitGraph from './GitGraph.vue'
 
 import { WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, GitOperation } from '@/git'
+import type { Commit } from '@/git'
 
 const props = defineProps<{
   commit: Commit
