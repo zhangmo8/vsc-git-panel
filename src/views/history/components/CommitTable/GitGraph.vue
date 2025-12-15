@@ -4,6 +4,7 @@ const props = defineProps<{
     node: { x: number, color: string }
     edges: { toX: number, color: string, type: 'straight' | 'merge' }[]
     columns: (string | null)[]
+    hasIncoming: boolean
   }
   isSelected?: boolean
   hasBranchLabel?: boolean
@@ -103,7 +104,7 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
 
       <!-- 3. 绘制来自上方的连接线 (如果当前节点不是起始点) -->
       <line
-        v-if="props.graph.columns[props.graph.node.x]"
+        v-if="props.graph.hasIncoming"
         :x1="getX(props.graph.node.x)"
         :y1="0"
         :x2="getX(props.graph.node.x)"

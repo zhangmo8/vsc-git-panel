@@ -50,10 +50,13 @@ const processedRows = computed(() => {
       node: { x: number, color: string }
       edges: { toX: number, color: string, type: 'straight' | 'merge' }[]
       columns: (string | null)[]
+      hasIncoming: boolean
     }
   }[] = []
 
-  const columns: ({ hash: string, color: string } | null)[] = []
+  type ColumnEntry = { hash: string, color: string } | null
+  const columns: ColumnEntry[] = []
+  const columnMap = new Map<string, number>()
   const colors = [
     '#0075ca', // Blue
     '#1db35b', // Green
@@ -89,20 +92,27 @@ const processedRows = computed(() => {
     return colors[colorIndex++ % colors.length]
   }
 
+  const findAvailableColumnIndex = (targetColumns: ColumnEntry[]) => {
+    const emptyIndex = targetColumns.findIndex(c => c === null)
+    return emptyIndex === -1 ? targetColumns.length : emptyIndex
+  }
+
   for (const commit of commitData.value) {
     // 1. 查找当前 commit 是否在追踪列中
-    let colIndex = columns.findIndex(c => c && c.hash === commit.hash)
+    const trackedColumnIndex = columnMap.get(commit.hash)
+    let colIndex = trackedColumnIndex ?? -1
+    const hasIncomingLine = trackedColumnIndex !== undefined
     let color
 
     if (colIndex === -1) {
       // 未追踪（新分支头），找第一个空闲列或追加
-      colIndex = columns.findIndex(c => c === null)
-      if (colIndex === -1) {
-        colIndex = columns.length
+      colIndex = findAvailableColumnIndex(columns)
+      if (colIndex === columns.length) {
         columns.push(null)
       }
       color = getNextColor()
       columns[colIndex] = { hash: commit.hash, color }
+      columnMap.set(commit.hash, colIndex)
     }
     else {
       color = columns[colIndex]!.color
@@ -117,11 +127,27 @@ const processedRows = computed(() => {
 
     // 2. 决定下一行的列状态
     const nextColumns = [...columns]
+    const nextColumnMap = new Map(columnMap)
+    const releaseColumn = (index: number) => {
+      const existing = nextColumns[index]
+      if (existing) {
+        nextColumnMap.delete(existing.hash)
+      }
+      nextColumns[index] = null
+    }
+    const assignColumn = (index: number, hash: string, valueColor: string) => {
+      const existing = nextColumns[index]
+      if (existing && existing.hash !== hash) {
+        nextColumnMap.delete(existing.hash)
+      }
+      nextColumns[index] = { hash, color: valueColor }
+      nextColumnMap.set(hash, index)
+    }
     const parents = commit.parents || []
 
     if (parents.length === 0) {
       // 分支结束
-      nextColumns[colIndex] = null
+      releaseColumn(colIndex)
     }
     else {
       // Parent 0 继承当前列
@@ -129,33 +155,32 @@ const processedRows = computed(() => {
 
       // 检查 p0 是否已经被其他列追踪（合并汇聚点）
       // 注意：这里检查的是 nextColumns，因为我们在构建下一行的状态
-      const existingP0Index = nextColumns.findIndex(c => c && c.hash === p0)
+      const existingP0Index = nextColumnMap.get(p0) ?? -1
 
       if (existingP0Index !== -1 && existingP0Index !== colIndex) {
         // P0 已经在其他列中（合并），当前列结束，连线到 P0 所在列
-        nextColumns[colIndex] = null
+        releaseColumn(colIndex)
         edges.push({ toX: existingP0Index, color, type: 'merge' })
       }
       else {
         // P0 未被追踪，或者就在当前列，继续追踪
-        nextColumns[colIndex] = { hash: p0, color }
+        assignColumn(colIndex, p0, color)
         edges.push({ toX: colIndex, color, type: 'straight' })
       }
 
       // 处理其他 Parents (Merge Sources)
       for (let i = 1; i < parents.length; i++) {
         const p = parents[i]
-        let pIndex = nextColumns.findIndex(c => c && c.hash === p)
+        let pIndex = nextColumnMap.get(p) ?? -1
 
         if (pIndex === -1) {
           // 未追踪，分配新列
-          pIndex = nextColumns.findIndex(c => c === null)
-          if (pIndex === -1) {
-            pIndex = nextColumns.length
+          pIndex = findAvailableColumnIndex(nextColumns)
+          if (pIndex === nextColumns.length) {
             nextColumns.push(null)
           }
           const pColor = getNextColor()
-          nextColumns[pIndex] = { hash: p, color: pColor }
+          assignColumn(pIndex, p, pColor)
         }
 
         // 连线：从当前节点连向 parent 所在列
@@ -170,6 +195,7 @@ const processedRows = computed(() => {
         node,
         edges,
         columns: currentColumns,
+        hasIncoming: hasIncomingLine,
       },
     })
 
@@ -181,7 +207,13 @@ const processedRows = computed(() => {
 
     // 替换 columns
     columns.length = 0
-    nextColumns.forEach(c => columns.push(c))
+    columnMap.clear()
+    nextColumns.forEach((c, idx) => {
+      columns.push(c)
+      if (c) {
+        columnMap.set(c.hash, idx)
+      }
+    })
   }
 
   return rows

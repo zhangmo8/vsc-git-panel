@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
 import CopyButton from '../CopyButton/index.vue'
 import GitGraph from './GitGraph.vue'
 
@@ -15,10 +15,13 @@ const props = defineProps<{
     node: { x: number, color: string }
     edges: { toX: number, color: string, type: 'straight' | 'merge' }[]
     columns: (string | null)[]
+    hasIncoming: boolean
   }
 }>()
 
 const emit = defineEmits(['select'])
+
+const parsedRefs = computed(() => getRefsArray(props.commit.refs))
 
 const hoveredCell = ref<string | null>(null)
 
@@ -40,53 +43,133 @@ function getBranchColorFromGraphData(branchName: string): string {
   return `hsl(${hue}, 70%, 45%)`
 }
 
+type RefType = 'head' | 'local' | 'remote' | 'tag' | 'other'
+
+interface RefItem {
+  raw: string
+  name: string
+  displayName: string
+  type: RefType
+  isRemote: boolean
+  isTag: boolean
+}
+
 // 解析Git引用字符串为数组
-function getRefsArray(refsString: string) {
+function getRefsArray(refsString: string): RefItem[] {
   if (!refsString)
     return []
 
   // 将引用字符串分割成数组
   const refs = refsString.split(',').map(ref => ref.trim())
 
-  return refs.map((ref) => {
-    // 判断是标签还是分支
-    const isTag = ref.includes('tag:') || ref.includes('refs/tags/')
-    let name = ref
-    let displayName = ref
+  const parsedRefs = refs.map((ref) => {
+    const normalized = ref.replace(/^refs\//, '')
+    let name = normalized
+    let displayName = normalized
+    let type: RefType = 'other'
+    let isTag = false
+    let isRemote = false
 
-    // 清理显示名称
-    if (ref.includes('refs/heads/')) {
-      // 本地分支
-      name = ref.replace('refs/heads/', '')
+    if (normalized.includes('remotes/')) {
+      name = normalized.replace('remotes/', '')
       displayName = name
+      type = 'remote'
+      isRemote = true
     }
-    else if (ref.includes('refs/remotes/')) {
-      // 远程分支
-      name = ref.replace('refs/remotes/', '')
+    else if (normalized.includes('heads/')) {
+      name = normalized.replace('heads/', '')
       displayName = name
+      type = 'local'
     }
-    else if (ref.includes('tag:')) {
-      // 标签格式1
-      name = ref.replace('tag:', '')
+    else if (normalized.includes('tags/')) {
+      name = normalized.replace('tags/', '').replace('tag:', '')
       displayName = name
+      type = 'tag'
+      isTag = true
     }
-    else if (ref.includes('refs/tags/')) {
-      // 标签格式2
-      name = ref.replace('refs/tags/', '')
+    else if (normalized.includes('tag:')) {
+      name = normalized.replace('tag:', '')
       displayName = name
+      type = 'tag'
+      isTag = true
+    }
+    else if (ref.startsWith('HEAD ->')) {
+      name = ref.replace('HEAD -> ', '')
+      displayName = name
+      type = 'head'
     }
     else if (ref === 'HEAD') {
       name = 'HEAD'
       displayName = 'HEAD'
+      type = 'head'
     }
 
     return {
       raw: ref,
       name,
       displayName,
+      type,
+      isRemote,
       isTag,
-    }
+    } as RefItem
   })
+
+  const typeOrder: Record<RefType, number> = {
+    head: 0,
+    local: 1,
+    remote: 2,
+    tag: 3,
+    other: 4,
+  }
+
+  return parsedRefs.sort((a, b) => typeOrder[a.type] - typeOrder[b.type])
+}
+
+function getRefStyle(refItem: RefItem) {
+  if (refItem.type === 'tag') {
+    return {
+      backgroundColor: 'var(--vscode-badge-background)',
+      borderColor: 'var(--vscode-panel-border)',
+      color: 'var(--vscode-badge-foreground)',
+      boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+    }
+  }
+
+  if (refItem.type === 'head') {
+    return {
+      backgroundColor: '#e81123',
+      borderColor: '#f1707a',
+      color: '#ffffff',
+      boxShadow: '0 1px 4px rgba(232,17,35,0.4)',
+    }
+  }
+
+  const branchColor = getBranchColorFromGraphData(refItem.name)
+  return {
+    backgroundColor: branchColor,
+    borderColor: branchColor,
+    color: '#ffffff',
+    boxShadow: `0 1px 4px ${branchColor}44`,
+  }
+}
+
+function getRefIcons(refItem: RefItem) {
+  const icons: string[] = []
+
+  if (refItem.type === 'head') {
+    icons.push('codicon-target')
+  }
+  else if (refItem.type === 'remote') {
+    icons.push('codicon-cloud')
+  }
+  else if (refItem.type === 'tag') {
+    icons.push('codicon-tag')
+  }
+  else {
+    icons.push('codicon-git-branch')
+  }
+
+  return icons
 }
 
 function handleCommitClick(event: MouseEvent) {
@@ -115,23 +198,60 @@ function handleDoubleClick() {
     @dblclick="handleDoubleClick"
   >
     <div class="branch-name-col commit-cell" :style="{ width: `${columnWidths.branchName}px` }">
-      <template v-if="commit.refs && commit.refs !== ''">
+      <template v-if="parsedRefs.length > 0">
         <div class="refs-container">
-          <template v-for="refItem in getRefsArray(commit.refs)" :key="refItem.raw">
-            <span
-              class="ref-item"
-              :class="{ tag: refItem.isTag, branch: !refItem.isTag }"
-              :style="{
-                backgroundColor: !refItem.isTag ? getBranchColorFromGraphData(refItem.name) : undefined,
-                color: !refItem.isTag ? '#ffffff' : undefined,
-                borderColor: !refItem.isTag ? getBranchColorFromGraphData(refItem.name) : undefined,
-              }"
-            >
-              <span v-if="!refItem.isTag" class="codicon codicon-git-branch" style="font-size: 12px; margin-right: 4px;" />
-              <span v-else class="codicon codicon-tag" style="font-size: 12px; margin-right: 4px;" />
-              {{ refItem.displayName }}
+          <!-- First item -->
+          <span
+            class="ref-item"
+            :class="{
+              tag: parsedRefs[0].type === 'tag',
+              head: parsedRefs[0].type === 'head',
+              remote: parsedRefs[0].type === 'remote',
+            }"
+            :style="getRefStyle(parsedRefs[0])"
+            :title="parsedRefs[0].displayName"
+          >
+            <span class="ref-icons">
+              <span
+                v-for="icon in getRefIcons(parsedRefs[0])"
+                :key="`${parsedRefs[0].raw}-${icon}`"
+                class="codicon" :class="[icon]"
+              />
             </span>
-          </template>
+            <span class="ref-text">
+              {{ parsedRefs[0].displayName }}
+            </span>
+          </span>
+
+          <!-- More badge -->
+          <span v-if="parsedRefs.length > 1" class="ref-more-badge">
+            +{{ parsedRefs.length - 1 }}
+            <div class="more-refs-popup">
+              <template v-for="refItem in parsedRefs.slice(1)" :key="refItem.raw">
+                <span
+                  class="ref-item"
+                  :class="{
+                    tag: refItem.type === 'tag',
+                    head: refItem.type === 'head',
+                    remote: refItem.type === 'remote',
+                  }"
+                  :style="getRefStyle(refItem)"
+                  :title="refItem.displayName"
+                >
+                  <span class="ref-icons">
+                    <span
+                      v-for="icon in getRefIcons(refItem)"
+                      :key="`${refItem.raw}-${icon}`"
+                      class="codicon" :class="[icon]"
+                    />
+                  </span>
+                  <span class="ref-text">
+                    {{ refItem.displayName }}
+                  </span>
+                </span>
+              </template>
+            </div>
+          </span>
         </div>
       </template>
     </div>
@@ -248,38 +368,65 @@ function handleDoubleClick() {
 .branch-name-col {
   white-space: normal;
   padding: 0px;
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  overflow: visible;
 }
 
 .refs-container {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 6px;
   align-items: center;
-  justify-content: flex-end; /* Align badges to the right to connect with graph */
-  padding-right: 8px;
+  justify-content: flex-end;
+  padding: 4px 8px 4px 0;
 }
 
 .ref-item {
   display: inline-flex;
   align-items: center;
+  font-size: 11px;
+  padding: 2px 6px;
+  white-space: nowrap;
+  border-radius: 4px;
+  font-weight: 500;
+  line-height: 16px;
+}
+
+.ref-more-badge {
+  display: inline-flex;
+  align-items: center;
   justify-content: center;
-  font-size: 0.8em;
+  font-size: 11px;
   padding: 2px 6px;
   border-radius: 4px;
-  white-space: nowrap;
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-}
-
-.ref-item.branch {
-  border: 1px solid;
-  font-weight: 500;
-}
-
-.ref-item.tag {
   background-color: var(--vscode-badge-background);
   color: var(--vscode-badge-foreground);
+  cursor: pointer;
+  position: relative;
+  height: 16px;
+  line-height: 16px;
+}
+
+.more-refs-popup {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 100;
+  background-color: var(--vscode-editor-background);
+  border: 1px solid var(--vscode-widget-border);
+  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  padding: 8px;
+  border-radius: 4px;
+  flex-direction: column;
+  gap: 4px;
+  min-width: max-content;
+  margin-top: 4px;
+}
+
+.ref-more-badge:hover .more-refs-popup {
+  display: flex;
 }
 </style>

@@ -68,14 +68,14 @@ function handleDragEnd() {
 
 <template>
   <li class="commit-header">
-    <!-- <span class="column-header" :style="{ width: `${modelValue?.branchName}px` }">
-      Branch/Tag
+    <span class="column-header" :style="{ width: `${modelValue?.branchName}px` }">
+      Refs
       <ResizeHandle :is-active="currentColumn === 'branchName'" @mousedown="handleDragStart($event, 'branchName')" />
-    </span> -->
-    <!-- <span class="column-header" :style="{ width: `${modelValue?.branch}px` }">
+    </span>
+    <span class="column-header" :style="{ width: `${modelValue?.branch}px` }">
       Graph
       <ResizeHandle :is-active="currentColumn === 'branch'" @mousedown="handleDragStart($event, 'branch')" />
-    </span> -->
+    </span>
     <span class="hash-col column-header" :style="{ width: `${modelValue?.hash}px` }">
       CommitId
       <ResizeHandle :is-active="currentColumn === 'hash'" @mousedown="handleDragStart($event, 'hash')" />
@@ -92,8 +92,9 @@ function handleDragEnd() {
       Author
       <ResizeHandle :is-active="currentColumn === 'author'" @mousedown="handleDragStart($event, 'author')" />
     </span>
-    <span class="column-header">
+    <span class="column-header" :style="{ width: `${modelValue?.date}px` }">
       Date
+      <ResizeHandle :is-active="currentColumn === 'date'" @mousedown="handleDragStart($event, 'date')" />
     </span>
   </li>
 </template>
