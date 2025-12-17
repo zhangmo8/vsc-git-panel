@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { defineModel, ref } from 'vue'
+import { ref } from 'vue'
 import ResizeHandle from '../ResizeHandle/index.vue'
 
 interface ColumnWidths {
@@ -12,11 +12,44 @@ interface ColumnWidths {
   date: number
 }
 
+const FLEXIBLE_COLUMN: keyof ColumnWidths = 'branchName'
+const MIN_WIDTHS: Record<keyof ColumnWidths, number> = {
+  branchName: 80,
+  branch: 60,
+  hash: 60,
+  message: 110,
+  stats: 90,
+  author: 70,
+  date: 90,
+}
+
 const modelValue = defineModel<ColumnWidths>()
 const isDragging = ref(false)
 const currentColumn = ref<keyof ColumnWidths>()
 const startX = ref(0)
 const startWidth = ref(0)
+
+function getColumnStyle(column: keyof ColumnWidths) {
+  const width = modelValue.value?.[column] ?? MIN_WIDTHS[column]
+  const minWidth = MIN_WIDTHS[column]
+  if (column === FLEXIBLE_COLUMN) {
+    return {
+      flex: `1 1 ${width}px`,
+      minWidth: `${minWidth}px`,
+    }
+  }
+  if (column === 'branch') {
+    return {
+      flex: `0 0 ${width}px`,
+      minWidth: `${minWidth}px`,
+    }
+  }
+
+  return {
+    flex: `0 1 ${width}px`,
+    minWidth: `${minWidth}px`,
+  }
+}
 
 function handleDragStart(e: MouseEvent, column: keyof ColumnWidths) {
   e.preventDefault()
@@ -45,7 +78,8 @@ function handleDragging(e: MouseEvent) {
   e.stopPropagation()
 
   const diff = e.clientX - startX.value
-  const newWidth = Math.max(100, startWidth.value + diff)
+  const minWidth = MIN_WIDTHS[currentColumn.value!]
+  const newWidth = Math.max(minWidth, startWidth.value + diff)
 
   modelValue.value![currentColumn.value!] = newWidth
 }
@@ -68,31 +102,31 @@ function handleDragEnd() {
 
 <template>
   <li class="commit-header">
-    <span class="column-header" :style="{ width: `${modelValue?.branchName}px` }">
+    <span class="column-header" :style="getColumnStyle('branchName')">
       Refs
       <ResizeHandle :is-active="currentColumn === 'branchName'" @mousedown="handleDragStart($event, 'branchName')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue?.branch}px` }">
+    <span class="column-header" :style="getColumnStyle('branch')">
       Graph
       <ResizeHandle :is-active="currentColumn === 'branch'" @mousedown="handleDragStart($event, 'branch')" />
     </span>
-    <span class="hash-col column-header" :style="{ width: `${modelValue?.hash}px` }">
+    <span class="hash-col column-header" :style="getColumnStyle('hash')">
       CommitId
       <ResizeHandle :is-active="currentColumn === 'hash'" @mousedown="handleDragStart($event, 'hash')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue?.message}px` }">
+    <span class="column-header" :style="getColumnStyle('message')">
       Message
       <ResizeHandle :is-active="currentColumn === 'message'" @mousedown="handleDragStart($event, 'message')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue?.stats}px` }">
+    <span class="column-header" :style="getColumnStyle('stats')">
       Changes
       <ResizeHandle :is-active="currentColumn === 'stats'" @mousedown="handleDragStart($event, 'stats')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue?.author}px` }">
+    <span class="column-header" :style="getColumnStyle('author')">
       Author
       <ResizeHandle :is-active="currentColumn === 'author'" @mousedown="handleDragStart($event, 'author')" />
     </span>
-    <span class="column-header" :style="{ width: `${modelValue?.date}px` }">
+    <span class="column-header" :style="getColumnStyle('date')">
       Date
       <ResizeHandle :is-active="currentColumn === 'date'" @mousedown="handleDragStart($event, 'date')" />
     </span>
@@ -124,6 +158,7 @@ function handleDragEnd() {
   text-overflow: ellipsis;
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .hash-col {

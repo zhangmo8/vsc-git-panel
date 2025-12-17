@@ -374,7 +374,7 @@ onUnmounted(() => {
   list-style: none;
   font-size: var(--vscode-font-size);
   color: var(--vscode-foreground);
-  min-width: min-content;
+  min-width: 100%;
 }
 
 .loading-trigger {

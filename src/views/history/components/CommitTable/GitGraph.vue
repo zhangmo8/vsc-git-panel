@@ -11,7 +11,7 @@ const props = defineProps<{
 }>()
 
 // SVG宽度将根据分支数量动态计算
-const SVG_HEIGHT = 33
+const SVG_HEIGHT = 32
 // 图表配置
 const DOT_SIZE = 10
 const LINE_WIDTH = 3
@@ -138,7 +138,8 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
 .git-graph {
   width: 100%;
   padding: 0 8px;
-  overflow: visible; /* 允许 SVG 超出容器 */
+  overflow-x: hidden;
+  overflow-y: visible;
   position: absolute;
   top: 0;
   left: 0;
