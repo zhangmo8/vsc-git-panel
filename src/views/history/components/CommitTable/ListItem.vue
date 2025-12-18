@@ -532,7 +532,8 @@ function handleDoubleClick() {
   display: inline-block;
 }
 
-.commit-row:hover .refs-container.ghost .ref-item.ghost {
+.commit-row:hover .refs-container.ghost .ref-item.ghost,
+.commit-row.selected .refs-container.ghost .ref-item.ghost {
   opacity: 0.55;
   visibility: visible;
 }

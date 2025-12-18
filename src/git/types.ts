@@ -27,6 +27,7 @@ export interface BaseOperation {
   hash: string
   message: string
   branchChanged: boolean
+  branchExplicit?: boolean
   branchColor?: string
 }
 

@@ -38,10 +38,12 @@ const columnWidths = ref({
 const branchLookup = computed<Record<string, string>>(() => {
   const lookup: Record<string, string> = {}
   for (const operation of props.graphData || []) {
-    if (operation.hash) {
-      lookup[operation.hash] = operation.branch
-    }
+    if (!operation.hash || !operation.branchExplicit)
+      continue
+
+    lookup[operation.hash] = operation.branch
   }
+
   return lookup
 })
 
@@ -113,16 +115,26 @@ const processedRows = computed(() => {
   }
 
   const normalizeCommitRef = (ref: string) => {
-    if (ref.startsWith('HEAD -> '))
-      return ref.replace('HEAD -> ', '')
+    if (!ref)
+      return ''
 
-    if (ref.startsWith('refs/heads/'))
-      return ref.substring('refs/heads/'.length)
+    let cleaned = ref.trim()
+    cleaned = cleaned.replace(/^\(+/, '').replace(/\)+$/, '').trim()
+    cleaned = cleaned.replace(/^,+/, '').replace(/,+$/, '').trim()
 
-    if (ref.startsWith('refs/remotes/'))
-      return ref.substring('refs/remotes/'.length)
+    if (cleaned.startsWith('HEAD -> '))
+      cleaned = cleaned.replace('HEAD -> ', '')
 
-    return ref
+    if (cleaned.startsWith('refs/heads/'))
+      cleaned = cleaned.substring('refs/heads/'.length)
+
+    if (cleaned.startsWith('refs/remotes/'))
+      cleaned = cleaned.substring('refs/remotes/'.length)
+
+    if (cleaned.startsWith('ref:'))
+      cleaned = cleaned.substring('ref:'.length)
+
+    return cleaned.replace(/[()]/g, '').trim()
   }
 
   const extractBranchLabel = (commit: Commit) => {
@@ -255,15 +267,6 @@ const processedRows = computed(() => {
     }
 
     const explicitLabel = extractBranchLabel(commit)
-    if (!explicitLabel && !columnLabels[colIndex]) {
-      console.info('[webview] column empty, fallback', {
-        hash: commit.hash,
-        refs: commit.refs,
-        branchName: commit.branchName,
-        inferred: hashToBranch[commit.hash],
-      })
-    }
-
     rows.push({
       commit,
       graph: {

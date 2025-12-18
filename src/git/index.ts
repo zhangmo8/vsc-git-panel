@@ -7,6 +7,28 @@ import { logger } from '@/utils'
 
 export * from './types'
 
+function normalizeRef(ref: string) {
+  if (!ref)
+    return ''
+
+  let cleaned = ref.trim()
+  cleaned = cleaned.replace(/^\(+/, '').replace(/\)+$/, '').trim()
+  cleaned = cleaned.replace(/^,+/, '').replace(/,+$/, '').trim()
+  if (cleaned.startsWith('HEAD -> '))
+    cleaned = cleaned.replace('HEAD -> ', '')
+
+  if (cleaned.startsWith('refs/heads/'))
+    cleaned = cleaned.substring('refs/heads/'.length)
+
+  if (cleaned.startsWith('refs/remotes/'))
+    cleaned = cleaned.substring('refs/remotes/'.length)
+
+  if (cleaned.startsWith('ref:'))
+    cleaned = cleaned.substring('ref:'.length)
+
+  return cleaned.replace(/[()]/g, '').trim()
+}
+
 export const useGitService = createSingletonComposable(() => {
   const workspaceFolders = useWorkspaceFolders()
   if (!workspaceFolders.value || workspaceFolders.value.length === 0)
@@ -84,7 +106,7 @@ export const useGitService = createSingletonComposable(() => {
         logArgs.push(`--max-count=${pageSize}`)
       }
       // 最后加 format 和 stat
-      logArgs.push(prettyFormat, '--stat')
+      logArgs.push('--decorate=full', prettyFormat, '--stat')
 
       let logResult: ExtendedLogResult
       try {
@@ -142,15 +164,14 @@ export const useGitService = createSingletonComposable(() => {
           if (refs) {
             const refsArr = refs.split(',').map(r => r.trim())
             const branchRef = refsArr.find(ref =>
-              ref.includes('refs/heads/') || (!ref.includes('refs/') && !ref.includes('tag:')),
+              ref.includes('refs/heads/')
+              || ref.includes('refs/remotes/')
+              || ref.startsWith('HEAD -> ')
+              || (!ref.includes('refs/') && !ref.includes('tag:')),
             )
+
             if (branchRef) {
-              branchName = branchRef.replace('refs/heads/', '')
-                .replace('refs/remotes/', '')
-                .replace('HEAD -> ', '')
-                .split('/')
-                .slice(1)
-                .join('/') || branchRef.replace('refs/heads/', '').replace('refs/remotes/', '').replace('HEAD -> ', '')
+              branchName = normalizeRef(branchRef)
             }
           }
 
@@ -210,12 +231,7 @@ export const useGitService = createSingletonComposable(() => {
               || ref.includes('refs/remotes/')
               || (!ref.includes('refs/') && !ref.includes('tag:')),
             )
-            .map((ref) => {
-              const branch = ref.replace('refs/heads/', '')
-                .replace('refs/remotes/', '').split('/').slice(1).join('/')
-                .replace('HEAD -> ', '')
-              return branch
-            })
+            .map(ref => normalizeRef(ref))
             .filter(Boolean)
 
           branches.forEach(branch => branchSet.add(branch))
@@ -231,14 +247,17 @@ export const useGitService = createSingletonComposable(() => {
       const operations: GitOperation[] = logResult.all.map((commit) => {
         // 从 refs 中提取主要分支
         let mainBranch = 'main'
+        let branchRefs: string[] = []
         if (commit.refs) {
           const refs = commit.refs.split(',').map(ref => ref.trim())
-          const branchRefs = refs
+          branchRefs = refs
             .filter(ref =>
               ref.includes('refs/heads/')
+              || ref.includes('refs/remotes/')
+              || ref.startsWith('HEAD -> ')
               || (!ref.includes('refs/') && !ref.includes('tag:')),
             )
-            .map(ref => ref.replace('refs/heads/', '').replace('HEAD -> ', ''))
+            .map(ref => normalizeRef(ref))
             .filter(Boolean)
 
           if (branchRefs.length > 0) {
@@ -252,6 +271,7 @@ export const useGitService = createSingletonComposable(() => {
           hash: commit.hash,
           message: commit.message,
           branchChanged: false, // 简化：不计算分支变化
+          branchExplicit: branchRefs.length > 0,
         }
       })
 
