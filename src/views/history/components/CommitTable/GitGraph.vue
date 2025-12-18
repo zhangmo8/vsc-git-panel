@@ -136,10 +136,9 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
 
 <style scoped>
 .git-graph {
-  width: 100%;
+  width: calc(100% + 16px);
   padding: 0 8px;
-  overflow-x: hidden;
-  overflow-y: visible;
+  overflow: visible;
   position: absolute;
   top: 0;
   left: 0;

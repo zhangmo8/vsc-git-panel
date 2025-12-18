@@ -145,7 +145,7 @@ function handleDragEnd() {
   width: 100%;
   box-sizing: border-box;
   padding: 8px 0px;
-  z-index: 2;
+  z-index: 5;
 }
 
 .column-header {

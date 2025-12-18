@@ -35,15 +35,28 @@ const columnWidths = ref({
   date: 160,
 })
 
+const branchLookup = computed<Record<string, string>>(() => {
+  const lookup: Record<string, string> = {}
+  for (const operation of props.graphData || []) {
+    if (operation.hash) {
+      lookup[operation.hash] = operation.branch
+    }
+  }
+  return lookup
+})
+
 const commitData = computed(() => {
+  const branches = branchLookup.value
   return (props.commits || []).map(commit => ({
     ...commit,
+    branchName: commit.branchName || branches[commit.hash] || '',
     date: dayjs(commit.date).format('YYYY-MM-DD HH:mm'),
   }))
 })
 
 // 计算所有活跃分支和图表数据
 const processedRows = computed(() => {
+  const hashToBranch = branchLookup.value
   const rows: {
     commit: any
     graph: {
@@ -52,11 +65,13 @@ const processedRows = computed(() => {
       columns: (string | null)[]
       hasIncoming: boolean
     }
+    branchHint: string
   }[] = []
 
   type ColumnEntry = { hash: string, color: string } | null
   const columns: ColumnEntry[] = []
   const columnMap = new Map<string, number>()
+  const columnLabels: (string | null)[] = []
   const colors = [
     '#0075ca', // Blue
     '#1db35b', // Green
@@ -97,6 +112,40 @@ const processedRows = computed(() => {
     return emptyIndex === -1 ? targetColumns.length : emptyIndex
   }
 
+  const normalizeCommitRef = (ref: string) => {
+    if (ref.startsWith('HEAD -> '))
+      return ref.replace('HEAD -> ', '')
+
+    if (ref.startsWith('refs/heads/'))
+      return ref.substring('refs/heads/'.length)
+
+    if (ref.startsWith('refs/remotes/'))
+      return ref.substring('refs/remotes/'.length)
+
+    return ref
+  }
+
+  const extractBranchLabel = (commit: Commit) => {
+    if (commit.branchName)
+      return commit.branchName
+
+    if (!commit.refs)
+      return ''
+
+    const refs = commit.refs.split(',').map(ref => ref.trim())
+    const branchRef = refs.find(ref =>
+      ref.includes('refs/heads/')
+      || ref.includes('refs/remotes/')
+      || ref.startsWith('HEAD -> ')
+      || (!ref.includes('refs/') && !ref.includes('tag:')),
+    )
+
+    if (!branchRef)
+      return ''
+
+    return normalizeCommitRef(branchRef)
+  }
+
   for (const commit of commitData.value) {
     // 1. 查找当前 commit 是否在追踪列中
     const trackedColumnIndex = columnMap.get(commit.hash)
@@ -109,10 +158,16 @@ const processedRows = computed(() => {
       colIndex = findAvailableColumnIndex(columns)
       if (colIndex === columns.length) {
         columns.push(null)
+        columnLabels.push(null)
       }
       color = getNextColor()
       columns[colIndex] = { hash: commit.hash, color }
       columnMap.set(commit.hash, colIndex)
+      if (!columnLabels[colIndex]) {
+        const inferredLabel = hashToBranch[commit.hash] || commit.branchName || ''
+        if (inferredLabel)
+          columnLabels[colIndex] = inferredLabel
+      }
     }
     else {
       color = columns[colIndex]!.color
@@ -128,12 +183,14 @@ const processedRows = computed(() => {
     // 2. 决定下一行的列状态
     const nextColumns = [...columns]
     const nextColumnMap = new Map(columnMap)
+    const nextColumnLabels = [...columnLabels]
     const releaseColumn = (index: number) => {
       const existing = nextColumns[index]
       if (existing) {
         nextColumnMap.delete(existing.hash)
       }
       nextColumns[index] = null
+      nextColumnLabels[index] = null
     }
     const assignColumn = (index: number, hash: string, valueColor: string) => {
       const existing = nextColumns[index]
@@ -142,6 +199,13 @@ const processedRows = computed(() => {
       }
       nextColumns[index] = { hash, color: valueColor }
       nextColumnMap.set(hash, index)
+      if (typeof nextColumnLabels[index] === 'undefined')
+        nextColumnLabels[index] = null
+      if (!nextColumnLabels[index]) {
+        const inferredParent = hashToBranch[hash] || ''
+        if (inferredParent)
+          nextColumnLabels[index] = inferredParent
+      }
     }
     const parents = commit.parents || []
 
@@ -178,6 +242,7 @@ const processedRows = computed(() => {
           pIndex = findAvailableColumnIndex(nextColumns)
           if (pIndex === nextColumns.length) {
             nextColumns.push(null)
+            nextColumnLabels.push(null)
           }
           const pColor = getNextColor()
           assignColumn(pIndex, p, pColor)
@@ -189,6 +254,16 @@ const processedRows = computed(() => {
       }
     }
 
+    const explicitLabel = extractBranchLabel(commit)
+    if (!explicitLabel && !columnLabels[colIndex]) {
+      console.info('[webview] column empty, fallback', {
+        hash: commit.hash,
+        refs: commit.refs,
+        branchName: commit.branchName,
+        inferred: hashToBranch[commit.hash],
+      })
+    }
+
     rows.push({
       commit,
       graph: {
@@ -197,19 +272,27 @@ const processedRows = computed(() => {
         columns: currentColumns,
         hasIncoming: hasIncomingLine,
       },
+      branchHint: explicitLabel ? '' : (columnLabels[colIndex] || commit.branchName || ''),
     })
+
+    if (explicitLabel) {
+      nextColumnLabels[colIndex] = explicitLabel
+    }
 
     // 更新 columns
     // 更新 columns
     while (nextColumns.length > 0 && nextColumns[nextColumns.length - 1] === null) {
       nextColumns.pop()
+      nextColumnLabels.pop()
     }
 
     // 替换 columns
     columns.length = 0
     columnMap.clear()
+    columnLabels.length = 0
     nextColumns.forEach((c, idx) => {
       columns.push(c)
+      columnLabels.push(nextColumnLabels[idx] ?? null)
       if (c) {
         columnMap.set(c.hash, idx)
       }
@@ -334,6 +417,7 @@ onUnmounted(() => {
         :key="row.commit.hash"
         :commit="row.commit"
         :graph="row.graph"
+        :ghost-branch="row.branchHint"
         :column-widths="columnWidths"
         :is-selected="selectedCommitHashes.includes(row.commit.hash)"
         :class="{

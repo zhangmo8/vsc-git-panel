@@ -17,6 +17,7 @@ const props = defineProps<{
     columns: (string | null)[]
     hasIncoming: boolean
   }
+  ghostBranch?: string
 }>()
 
 const emit = defineEmits(['select'])
@@ -24,6 +25,12 @@ const emit = defineEmits(['select'])
 const parsedRefs = computed(() => getRefsArray(props.commit.refs))
 
 const hoveredCell = ref<string | null>(null)
+
+const ghostBranchName = computed(() => {
+  if (parsedRefs.value.length > 0)
+    return ''
+  return props.ghostBranch?.trim() || props.commit.branchName?.trim() || ''
+})
 
 type ColumnKey = 'branchName' | 'branch' | 'hash' | 'message' | 'stats' | 'author' | 'date'
 
@@ -189,6 +196,16 @@ function getRefStyle(refItem: RefItem) {
   }
 }
 
+function getGhostBadgeStyle(branchName: string) {
+  const color = getBranchColorFromGraphData(branchName)
+  return {
+    backgroundColor: color,
+    borderColor: color,
+    color: '#ffffff',
+    boxShadow: `0 1px 4px ${color}44`,
+  }
+}
+
 function getRefIcons(refItem: RefItem) {
   const icons: string[] = []
 
@@ -290,13 +307,28 @@ function handleDoubleClick() {
           </span>
         </div>
       </template>
+      <template v-else-if="ghostBranchName">
+        <div class="refs-container ghost">
+          <span class="ref-item ghost" :style="getGhostBadgeStyle(ghostBranchName)">
+            <span class="ref-icons">
+              <span class="codicon codicon-git-branch" />
+            </span>
+            <span class="ref-text">
+              {{ ghostBranchName }}
+            </span>
+          </span>
+        </div>
+      </template>
     </div>
     <div class="branch-col commit-cell" :style="getColumnStyle('branch')">
-      <GitGraph
-        :graph="graph"
-        :is-selected="isSelected"
-        :has-branch-label="!!(commit.refs && commit.refs !== '')"
-      />
+      <div class="branch-graph-mask">
+        <GitGraph
+          :graph="graph"
+          :is-selected="isSelected"
+          :has-branch-label="!!(commit.refs && commit.refs !== '')"
+        />
+      </div>
+      <div class="branch-graph-shadow" />
     </div>
     <span
       class="hash-col commit-cell" :style="getColumnStyle('hash')" @mouseenter="hoveredCell = 'hash'"
@@ -374,8 +406,23 @@ function handleDoubleClick() {
   padding: 0px;
   z-index: 1;
   height: 32px;
-  overflow-x: hidden;
-  overflow-y: visible;
+}
+
+.branch-graph-mask {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.branch-graph-shadow {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: -2px;
+  width: 10px;
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, var(--vscode-sideBar-background) 100%);
+  pointer-events: none;
 }
 
 .hash-col {
@@ -407,17 +454,28 @@ function handleDoubleClick() {
   display: flex;
   align-items: center;
   min-height: 32px;
-  overflow-x: hidden;
-  overflow-y: visible;
+  overflow: visible;
+  position: relative;
+  z-index: 3;
 }
 
 .refs-container {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: flex-start;
   padding: 4px 8px 4px 0;
+  width: 100%;
+  overflow: visible;
+  position: relative;
+  z-index: 3;
+}
+
+.refs-container.ghost {
+  justify-content: flex-start;
+  position: relative;
+  min-height: 24px;
 }
 
 .ref-item {
@@ -429,6 +487,13 @@ function handleDoubleClick() {
   border-radius: 4px;
   font-weight: 500;
   line-height: 16px;
+  max-width: 100%;
+  min-width: 0;
+  flex-shrink: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  position: relative;
+  z-index: 2;
 }
 
 .ref-more-badge {
@@ -444,6 +509,32 @@ function handleDoubleClick() {
   position: relative;
   height: 16px;
   line-height: 16px;
+  flex-shrink: 0;
+  z-index: 3;
+}
+
+.ref-item.ghost {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.ref-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  display: inline-block;
+}
+
+.commit-row:hover .refs-container.ghost .ref-item.ghost {
+  opacity: 0.55;
+  visibility: visible;
 }
 
 .more-refs-popup {
