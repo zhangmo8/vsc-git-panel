@@ -18,12 +18,13 @@
 
 <!-- configs -->
 
-| Key                                  | Description                                                       | Type      | Default |
-| ------------------------------------ | ----------------------------------------------------------------- | --------- | ------- |
-| `git-panel.history.pageSize`         | Number of commits to load per page in history view                | `number`  | `45`    |
-| `git-panel.history.refreshDebounce`  | Debounce time (ms) for auto-refresh when git changes are detected | `number`  | `500`   |
-| `git-panel.performance.enableCache`  | Enable caching of git history queries for better performance      | `boolean` | `true`  |
-| `git-panel.performance.cacheTimeout` | Cache timeout in milliseconds (default: 60 seconds)               | `number`  | `60000` |
+| Key                                  | Description                                                          | Type      | Default |
+| ------------------------------------ | -------------------------------------------------------------------- | --------- | ------- |
+| `git-panel.history.pageSize`         | Number of commits to load per page in history view                   | `number`  | `45`    |
+| `git-panel.history.refreshDebounce`  | Debounce time (ms) for auto-refresh when git changes are detected    | `number`  | `500`   |
+| `git-panel.performance.enableCache`  | Enable caching of git history queries for better performance         | `boolean` | `true`  |
+| `git-panel.performance.cacheTimeout` | Cache timeout in milliseconds (default: 60 seconds)                  | `number`  | `60000` |
+| `git-panel.search.enableFilePath`    | Enable file path search in history (requires -- separator in search) | `boolean` | `true`  |
 
 <!-- configs -->
 
@@ -38,6 +39,7 @@
 | `git-panel.history.refresh` | GitPanel: Refresh History            |
 | `git-panel.copyHash`        | GitPanel: Copy Commit Hash           |
 | `git-panel.showStats`       | GitPanel: Show Repository Statistics |
+| `git-panel.goToCommit`      | GitPanel: Go to Commit by Hash       |
 
 <!-- commands -->
 

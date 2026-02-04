@@ -23,6 +23,7 @@ function createCacheKey(filter?: GitHistoryFilter): string {
     filter.branches?.sort().join(',') || 'all',
     filter.author || 'any',
     filter.search || '',
+    filter.filePath || '',
     filter.page || 1,
     filter.pageSize || 45,
   ]
@@ -155,6 +156,12 @@ export const useGitService = createSingletonComposable(() => {
       else {
         logArgs.push(`--max-count=${pageSize}`)
       }
+
+      // Add file path filter if specified
+      if (filter?.filePath) {
+        logArgs.push('--', filter.filePath)
+      }
+
       // 最后加 format 和 stat
       logArgs.push('--decorate=full', prettyFormat, '--stat')
 

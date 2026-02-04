@@ -99,6 +99,12 @@
         "command": "git-panel.showStats",
         "title": "Show Repository Statistics",
         "icon": "$(graph)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.goToCommit",
+        "title": "Go to Commit by Hash",
+        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -117,6 +123,11 @@
           "command": "git-panel.showStats",
           "when": "view =~ /git-panel.history/",
           "group": "navigation@5"
+        },
+        {
+          "command": "git-panel.goToCommit",
+          "when": "view =~ /git-panel.history/",
+          "group": "navigation@6"
         }
       ],
       "view/item/context": [
@@ -156,6 +167,11 @@
           "description": "Cache timeout in milliseconds (default: 60 seconds)",
           "minimum": 10000,
           "maximum": 300000
+        },
+        "git-panel.search.enableFilePath": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable file path search in history (requires -- separator in search)"
         }
       }
     }
@@ -185,14 +201,14 @@
     "@vitejs/plugin-vue": "^5.2.4",
     "@vscode/vsce": "^3.7.0",
     "@vue/tsconfig": "^0.7.0",
-    "bumpp": "^9.11.1",
+    "bumpp": "^10.4.0",
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "dayjs": "^1.11.19",
     "eslint": "^9.39.1",
     "esno": "^4.8.0",
     "ovsx": "^0.10.6",
-    "pnpm": "^9.15.9",
+    "pnpm": "^10.28.2",
     "reactive-vscode": "^0.2.22",
     "tsup": "^8.5.1",
     "typescript": "~5.6.3",

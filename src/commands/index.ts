@@ -5,6 +5,7 @@ import diffCommand from './diff'
 import clearCommand from './clear'
 import copyHashCommand from './copyHash'
 import showStatsCommand from './showStats'
+import goToCommitCommand from './goToCommit'
 
 import { EXTENSION_SYMBOL } from '@/constant'
 
@@ -22,5 +23,6 @@ export function initCommands() {
     [`${EXTENSION_SYMBOL}.history.clear`]: clearCommand,
     [`${EXTENSION_SYMBOL}.copyHash`]: copyHashCommand,
     [`${EXTENSION_SYMBOL}.showStats`]: showStatsCommand,
+    [`${EXTENSION_SYMBOL}.goToCommit`]: goToCommitCommand,
   })
 }

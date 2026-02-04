@@ -52,4 +52,5 @@ export interface GitHistoryFilter {
   author?: string
   page?: number
   pageSize?: number
+  filePath?: string // Search commits that modified a specific file
 }
