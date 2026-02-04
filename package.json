@@ -215,6 +215,6 @@
     "vite": "^6.4.1",
     "vscode-ext-gen": "^0.4.4",
     "vue-tsc": "^2.2.12",
-    "vue-virtual-scroller": "^1.1.2"
+    "vue-virtual-scroller": "^2.0.0-beta.8"
   }
 }

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, toRaw } from 'vue'
 import dayjs from 'dayjs'
+import { RecycleScroller } from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 import ColumnHeader from './ColumnHeader.vue'
 import ListItem from './ListItem.vue'
@@ -413,59 +415,92 @@ onUnmounted(() => {
 <!-- :graph-data="graphData[index]"  -->
 <template>
   <div :class="{ dragging: isDragging }" class="git-graph" @mouseleave="handleMouseUp" @mouseup="handleMouseUp">
-    <ul class="commit-list">
-      <ColumnHeader v-model="columnWidths" />
-      <ListItem
-        v-for="(row, index) in processedRows"
-        :key="row.commit.hash"
-        :commit="row.commit"
-        :graph="row.graph"
-        :ghost-branch="row.branchHint"
-        :column-widths="columnWidths"
-        :is-selected="selectedCommitHashes.includes(row.commit.hash)"
-        :class="{
-          'being-dragged': isDragging && selectionStart !== null
-            && ((index >= selectionStart && index <= dragEndIndex)
-              || (index <= selectionStart && index >= dragEndIndex)),
-        }"
-        @select="(event) => handleCommitSelected(row.commit.hash, index, event)"
-        @mousedown="(event: MouseEvent) => handleMouseDown(index, event)"
-        @mouseover="() => isDragging && handleMouseOver(index)"
-      />
-      <li ref="loadingTriggerRef" class="loading-trigger">
-        <div v-if="hasMoreData" class="loading-text">
+    <div class="commit-list-container">
+      <ColumnHeader v-model="columnWidths" class="column-header" />
+      <RecycleScroller
+        v-slot="{ item: row, index }"
+        :items="processedRows"
+        :item-size="32"
+        key-field="commit.hash"
+        class="commit-scroller"
+        :buffer="200"
+        :prerender="20"
+      >
+        <ListItem
+          :key="row.commit.hash"
+          :commit="row.commit"
+          :graph="row.graph"
+          :ghost-branch="row.branchHint"
+          :column-widths="columnWidths"
+          :is-selected="selectedCommitHashes.includes(row.commit.hash)"
+          :class="{
+            'being-dragged': isDragging && selectionStart !== null
+              && ((index >= selectionStart && index <= dragEndIndex)
+                || (index <= selectionStart && index >= dragEndIndex)),
+          }"
+          @select="(event) => handleCommitSelected(row.commit.hash, index, event)"
+          @mousedown="(event: MouseEvent) => handleMouseDown(index, event)"
+          @mouseover="() => isDragging && handleMouseOver(index)"
+        />
+      </RecycleScroller>
+      <div v-if="hasMoreData" ref="loadingTriggerRef" class="loading-trigger">
+        <div class="loading-text">
           Loading more commits...
         </div>
-      </li>
-    </ul>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .git-graph {
   width: 100%;
-  overflow: auto;
+  height: 100%;
   font-family: var(--vscode-editor-font-family);
   user-select: none;
   /* Prevent text selection during drag */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .dragging {
   cursor: col-resize;
 }
 
-.commit-list {
-  width: 100%;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  font-size: var(--vscode-font-size);
-  color: var(--vscode-foreground);
-  min-width: 100%;
+.commit-list-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.column-header {
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: var(--vscode-sideBar-background);
+}
+
+.commit-scroller {
+  flex: 1;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.commit-scroller :deep(.vue-recycle-scroller__item-view) {
+  overflow: visible;
+}
+
+.commit-scroller :deep(.vue-recycle-scroller__item-wrapper) {
+  overflow: visible;
 }
 
 .loading-trigger {
   text-align: center;
+  padding: 8px 0;
+  flex-shrink: 0;
 }
 
 .loading-text {
