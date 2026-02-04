@@ -13,6 +13,7 @@ import { useDiffTreeView } from './diff/DiffTreeView'
 
 import { useGitService } from '@/git'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
+import { formatError, logger } from '@/utils'
 
 import type { CommitGraph, GitHistoryFilter } from '@/git'
 
@@ -159,9 +160,11 @@ export const useGitPanelView = createSingletonComposable(() => {
       })
     }
     catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git history:', error)
       postMessage({
-        command: 'Failed to get git history',
-        message: `${error}`,
+        command: 'error',
+        message: `Failed to load git history: ${errorMessage}`,
       })
     }
   }
@@ -176,9 +179,11 @@ export const useGitPanelView = createSingletonComposable(() => {
       })
     }
     catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git branches:', error)
       postMessage({
-        command: 'Failed to get git branches',
-        message: `${error}`,
+        command: 'error',
+        message: `Failed to load branches: ${errorMessage}`,
       })
     }
   }
@@ -193,9 +198,11 @@ export const useGitPanelView = createSingletonComposable(() => {
       })
     }
     catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git authors:', error)
       postMessage({
-        command: 'Failed to get git authors',
-        message: `${error}`,
+        command: 'error',
+        message: `Failed to load authors: ${errorMessage}`,
       })
     }
   }

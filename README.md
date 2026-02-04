@@ -31,12 +31,13 @@
 
 <!-- commands -->
 
-| Command                     | Title                      |
-| --------------------------- | -------------------------- |
-| `git-panel.history`         | GitPanel: History          |
-| `git-panel.history.clear`   | GitPanel: Clear Selection  |
-| `git-panel.history.refresh` | GitPanel: Refresh History  |
-| `git-panel.copyHash`        | GitPanel: Copy Commit Hash |
+| Command                     | Title                                |
+| --------------------------- | ------------------------------------ |
+| `git-panel.history`         | GitPanel: History                    |
+| `git-panel.history.clear`   | GitPanel: Clear Selection            |
+| `git-panel.history.refresh` | GitPanel: Refresh History            |
+| `git-panel.copyHash`        | GitPanel: Copy Commit Hash           |
+| `git-panel.showStats`       | GitPanel: Show Repository Statistics |
 
 <!-- commands -->
 

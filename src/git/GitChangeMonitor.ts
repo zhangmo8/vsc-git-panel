@@ -4,6 +4,18 @@ import { useGitPanelView } from '@/views/webview'
 import { config } from '@/config'
 import { useGitService } from '@/git'
 
+// Type for VSCode Git API repository
+interface GitRepository {
+  state: {
+    onDidChange: (callback: () => void) => Disposable
+  }
+}
+
+interface GitAPI {
+  repositories: GitRepository[]
+  onDidOpenRepository: (callback: (repo: GitRepository) => void) => Disposable
+}
+
 export const useGitChangeMonitor = createSingletonComposable(() => {
   const webview = useGitPanelView()
   const git = useGitService()
@@ -33,9 +45,9 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
   fsWatcher.onDidChange(onGitChange)
   fsWatcher.onDidCreate(onGitChange)
 
-  async function getGetInstance() {
+  async function getGetInstance(): Promise<GitAPI | undefined> {
     try {
-      const extension = extensions.getExtension(
+      const extension = extensions.getExtension<{ getAPI: (version: number) => GitAPI }>(
         'vscode.git',
       )
 
@@ -56,7 +68,7 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
     return undefined
   }
 
-  function setupRepository(repo: any) {
+  function setupRepository(repo: GitRepository) {
     try {
       disposables.value.push(repo.state.onDidChange(onGitChange))
     }

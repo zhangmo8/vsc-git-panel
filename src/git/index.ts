@@ -67,7 +67,7 @@ export const useGitService = createSingletonComposable(() => {
   const historyCache = new Map<string, CacheEntry<CommitGraph>>()
 
   // Helper to check if cache is valid
-  function isCacheValid(entry: CacheEntry<any>): boolean {
+  function isCacheValid<T>(entry: CacheEntry<T>): boolean {
     const cacheTimeout = config['performance.cacheTimeout'] ?? 60000
     return Date.now() - entry.timestamp < cacheTimeout
   }
@@ -186,7 +186,7 @@ export const useGitService = createSingletonComposable(() => {
           const parts = block.split('\x01')
           const [hash, parents, author_name, author_email, date, message, refs] = parts
           const bodyAndStats = parts.slice(7).join('\x01')
-          let files: any[] = []
+          let files: CommitFile[] = []
           let summary = ''
           let diff
           if (bodyAndStats) {
@@ -196,7 +196,7 @@ export const useGitService = createSingletonComposable(() => {
             files = statLines.map((l) => {
               const match = l.match(/([AMDCR])\s+(.+)/)
               return match ? { status: match[1], path: match[2] } : null
-            }).filter(Boolean)
+            }).filter((f): f is CommitFile => f !== null)
             // 统计 summary 行
             const summaryLine = lines.find(l => /files? changed/.test(l))
             if (summaryLine) {
@@ -249,9 +249,9 @@ export const useGitService = createSingletonComposable(() => {
           latest: all[0] || null,
         } as ExtendedLogResult
       }
-      catch (error: any) {
+      catch (error: unknown) {
         // 检查是否为 sha 不存在的错误
-        const msg = String(error?.message || error)
+        const msg = error instanceof Error ? error.message : String(error)
         if (msg.includes('bad revision') || msg.includes('unknown revision') || msg.includes('fatal:')) {
           // 返回空结果，避免 loading 卡死
           return {

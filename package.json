@@ -93,6 +93,12 @@
         "command": "git-panel.copyHash",
         "title": "Copy Commit Hash",
         "icon": "$(copy)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.showStats",
+        "title": "Show Repository Statistics",
+        "icon": "$(graph)"
       }
     ],
     "menus": {
@@ -106,6 +112,11 @@
           "command": "git-panel.history.clear",
           "when": "view =~ /git-panel.history/",
           "group": "navigation@4"
+        },
+        {
+          "command": "git-panel.showStats",
+          "when": "view =~ /git-panel.history/",
+          "group": "navigation@5"
         }
       ],
       "view/item/context": [
@@ -187,7 +198,6 @@
     "typescript": "~5.6.3",
     "vite": "^6.4.1",
     "vscode-ext-gen": "^0.4.4",
-    "vue-tsc": "^2.2.12",
-    "vue-virtual-scroller": "^1.1.2"
+    "vue-tsc": "^2.2.12"
   }
 }
