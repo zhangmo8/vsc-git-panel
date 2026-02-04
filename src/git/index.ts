@@ -4,8 +4,30 @@ import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 import type { SimpleGit } from 'simple-git'
 import type { Commit, CommitGraph, ExtendedLogResult, GitHistoryFilter, GitOperation } from './types'
 import { logger } from '@/utils'
+import { config } from '@/config'
 
 export * from './types'
+
+// Cache interface
+interface CacheEntry<T> {
+  data: T
+  timestamp: number
+}
+
+// Create a simple cache key from filter
+function createCacheKey(filter?: GitHistoryFilter): string {
+  if (!filter)
+    return 'default'
+
+  const parts = [
+    filter.branches?.sort().join(',') || 'all',
+    filter.author || 'any',
+    filter.search || '',
+    filter.page || 1,
+    filter.pageSize || 45,
+  ]
+  return parts.join('|')
+}
 
 function normalizeRef(ref: string) {
   if (!ref)
@@ -41,6 +63,21 @@ export const useGitService = createSingletonComposable(() => {
     maxConcurrentProcesses: 10,
   })
 
+  // Initialize cache storage
+  const historyCache = new Map<string, CacheEntry<CommitGraph>>()
+
+  // Helper to check if cache is valid
+  function isCacheValid(entry: CacheEntry<any>): boolean {
+    const cacheTimeout = config['performance.cacheTimeout'] ?? 60000
+    return Date.now() - entry.timestamp < cacheTimeout
+  }
+
+  // Helper to clear cache
+  function clearCache(): void {
+    historyCache.clear()
+    logger.info('Git history cache cleared')
+  }
+
   async function getAllBranches(): Promise<string[]> {
     try {
       const branches = await git.branch()
@@ -66,8 +103,21 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
-  async function getHistory(filter?: GitHistoryFilter): Promise<CommitGraph> {
+  async function getHistory(filter?: GitHistoryFilter, forceRefresh: boolean = false): Promise<CommitGraph> {
     try {
+      // Check cache if enabled and not forcing refresh
+      const enableCache = config['performance.enableCache'] ?? true
+      const cacheKey = createCacheKey(filter)
+
+      if (enableCache && !forceRefresh) {
+        const cached = historyCache.get(cacheKey)
+        if (cached && isCacheValid(cached)) {
+          logger.info(`Using cached git history for key: ${cacheKey}`)
+          return cached.data
+        }
+      }
+
+      const startTime = Date.now()
       const search = filter?.search?.trim()
       const hashSearch = search && search.length >= 7 && /^[a-f0-9]+$/i.test(search)
 
@@ -275,11 +325,25 @@ export const useGitService = createSingletonComposable(() => {
         }
       })
 
-      return {
+      const result = {
         operations,
         branches,
         logResult,
       }
+
+      // Cache the result if caching is enabled
+      if (enableCache) {
+        historyCache.set(cacheKey, {
+          data: result,
+          timestamp: Date.now(),
+        })
+        logger.info(`Cached git history for key: ${cacheKey}`)
+      }
+
+      const elapsed = Date.now() - startTime
+      logger.info(`Git history query completed in ${elapsed}ms`)
+
+      return result
     }
     catch (error) {
       logger.error('Error getting git history:', error)
@@ -346,5 +410,6 @@ export const useGitService = createSingletonComposable(() => {
     getAllBranches,
     getAllAuthors,
     getPreviousCommit,
+    clearCache,
   }
 })

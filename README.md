@@ -18,7 +18,12 @@
 
 <!-- configs -->
 
-**No data**
+| Key                                  | Description                                                       | Type      | Default |
+| ------------------------------------ | ----------------------------------------------------------------- | --------- | ------- |
+| `git-panel.history.pageSize`         | Number of commits to load per page in history view                | `number`  | `45`    |
+| `git-panel.history.refreshDebounce`  | Debounce time (ms) for auto-refresh when git changes are detected | `number`  | `500`   |
+| `git-panel.performance.enableCache`  | Enable caching of git history queries for better performance      | `boolean` | `true`  |
+| `git-panel.performance.cacheTimeout` | Cache timeout in milliseconds (default: 60 seconds)               | `number`  | `60000` |
 
 <!-- configs -->
 
@@ -26,11 +31,12 @@
 
 <!-- commands -->
 
-| Command                     | Title                     |
-| --------------------------- | ------------------------- |
-| `git-panel.history`         | GitPanel: History         |
-| `git-panel.history.clear`   | GitPanel: Clear Selection |
-| `git-panel.history.refresh` | GitPanel: Refresh History |
+| Command                     | Title                      |
+| --------------------------- | -------------------------- |
+| `git-panel.history`         | GitPanel: History          |
+| `git-panel.history.clear`   | GitPanel: Clear Selection  |
+| `git-panel.history.refresh` | GitPanel: Refresh History  |
+| `git-panel.copyHash`        | GitPanel: Copy Commit Hash |
 
 <!-- commands -->
 

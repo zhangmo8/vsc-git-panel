@@ -1,21 +1,31 @@
 import { type Disposable, extensions } from 'vscode'
 import { createSingletonComposable, ref, useFsWatcher } from 'reactive-vscode'
 import { useGitPanelView } from '@/views/webview'
+import { config } from '@/config'
+import { useGitService } from '@/git'
 
 export const useGitChangeMonitor = createSingletonComposable(() => {
   const webview = useGitPanelView()
+  const git = useGitService()
 
   const disposables = ref<Disposable[]>([])
   const retryCount = ref(0)
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
 
   const onGitChange = () => {
+    // Clear any existing timer
     if (debounceTimer) {
       clearTimeout(debounceTimer)
     }
+
+    // Get debounce time from config
+    const debounceTime = config['history.refreshDebounce'] ?? 500
+
+    // Clear cache and force refresh after debounce
     debounceTimer = setTimeout(() => {
+      git.clearCache()
       webview.refreshHistory(true)
-    }, 500)
+    }, debounceTime)
   }
 
   const fsWatcher = useFsWatcher('**/.git/index')

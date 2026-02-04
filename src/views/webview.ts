@@ -141,8 +141,8 @@ export const useGitPanelView = createSingletonComposable(() => {
     try {
       const filterToUse = filter !== undefined ? filter : currentFilter.value
 
-      // 直接从Git获取数据，不使用缓存
-      const { logResult, operations, branches } = await git.getHistory(filterToUse)
+      // Pass forceRefresh to git service to invalidate cache if needed
+      const { logResult, operations, branches } = await git.getHistory(filterToUse, _forceRefresh)
       commits.value = {
         logResult: {
           all: Array.from(logResult.all),

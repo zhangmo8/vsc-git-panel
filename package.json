@@ -87,6 +87,12 @@
         "command": "git-panel.history.refresh",
         "title": "Refresh History",
         "icon": "$(refresh)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.copyHash",
+        "title": "Copy Commit Hash",
+        "icon": "$(copy)"
       }
     ],
     "menus": {
@@ -101,12 +107,46 @@
           "when": "view =~ /git-panel.history/",
           "group": "navigation@4"
         }
+      ],
+      "view/item/context": [
+        {
+          "command": "git-panel.copyHash",
+          "when": "view == git-panel.changes && viewItem == git-commit",
+          "group": "inline"
+        }
       ]
     },
     "configuration": {
       "type": "object",
       "title": "VSC Git Panel",
-      "properties": {}
+      "properties": {
+        "git-panel.history.pageSize": {
+          "type": "number",
+          "default": 45,
+          "description": "Number of commits to load per page in history view",
+          "minimum": 10,
+          "maximum": 200
+        },
+        "git-panel.history.refreshDebounce": {
+          "type": "number",
+          "default": 500,
+          "description": "Debounce time (ms) for auto-refresh when git changes are detected",
+          "minimum": 100,
+          "maximum": 5000
+        },
+        "git-panel.performance.enableCache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable caching of git history queries for better performance"
+        },
+        "git-panel.performance.cacheTimeout": {
+          "type": "number",
+          "default": 60000,
+          "description": "Cache timeout in milliseconds (default: 60 seconds)",
+          "minimum": 10000,
+          "maximum": 300000
+        }
+      }
     }
   },
   "scripts": {
