@@ -13,6 +13,7 @@ import { useDiffTreeView } from './diff/DiffTreeView'
 
 import { useGitService } from '@/git'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
+import { formatError, logger } from '@/utils'
 
 import type { CommitGraph, GitHistoryFilter } from '@/git'
 
@@ -141,8 +142,8 @@ export const useGitPanelView = createSingletonComposable(() => {
     try {
       const filterToUse = filter !== undefined ? filter : currentFilter.value
 
-      // 直接从Git获取数据，不使用缓存
-      const { logResult, operations, branches } = await git.getHistory(filterToUse)
+      // Pass forceRefresh to git service to invalidate cache if needed
+      const { logResult, operations, branches } = await git.getHistory(filterToUse, _forceRefresh)
       commits.value = {
         logResult: {
           all: Array.from(logResult.all),
@@ -159,9 +160,11 @@ export const useGitPanelView = createSingletonComposable(() => {
       })
     }
     catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git history:', error)
       postMessage({
-        command: 'Failed to get git history',
-        message: `${error}`,
+        command: 'error',
+        message: `Failed to load git history: ${errorMessage}`,
       })
     }
   }
@@ -176,9 +179,11 @@ export const useGitPanelView = createSingletonComposable(() => {
       })
     }
     catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git branches:', error)
       postMessage({
-        command: 'Failed to get git branches',
-        message: `${error}`,
+        command: 'error',
+        message: `Failed to load branches: ${errorMessage}`,
       })
     }
   }
@@ -193,9 +198,11 @@ export const useGitPanelView = createSingletonComposable(() => {
       })
     }
     catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git authors:', error)
       postMessage({
-        command: 'Failed to get git authors',
-        message: `${error}`,
+        command: 'error',
+        message: `Failed to load authors: ${errorMessage}`,
       })
     }
   }

@@ -87,6 +87,24 @@
         "command": "git-panel.history.refresh",
         "title": "Refresh History",
         "icon": "$(refresh)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.copyHash",
+        "title": "Copy Commit Hash",
+        "icon": "$(copy)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.showStats",
+        "title": "Show Repository Statistics",
+        "icon": "$(graph)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.goToCommit",
+        "title": "Go to Commit by Hash",
+        "icon": "$(search)"
       }
     ],
     "menus": {
@@ -100,13 +118,62 @@
           "command": "git-panel.history.clear",
           "when": "view =~ /git-panel.history/",
           "group": "navigation@4"
+        },
+        {
+          "command": "git-panel.showStats",
+          "when": "view =~ /git-panel.history/",
+          "group": "navigation@5"
+        },
+        {
+          "command": "git-panel.goToCommit",
+          "when": "view =~ /git-panel.history/",
+          "group": "navigation@6"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "git-panel.copyHash",
+          "when": "view == git-panel.changes && viewItem == git-commit",
+          "group": "inline"
         }
       ]
     },
     "configuration": {
       "type": "object",
       "title": "VSC Git Panel",
-      "properties": {}
+      "properties": {
+        "git-panel.history.pageSize": {
+          "type": "number",
+          "default": 45,
+          "description": "Number of commits to load per page in history view",
+          "minimum": 10,
+          "maximum": 200
+        },
+        "git-panel.history.refreshDebounce": {
+          "type": "number",
+          "default": 500,
+          "description": "Debounce time (ms) for auto-refresh when git changes are detected",
+          "minimum": 100,
+          "maximum": 5000
+        },
+        "git-panel.performance.enableCache": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable caching of git history queries for better performance"
+        },
+        "git-panel.performance.cacheTimeout": {
+          "type": "number",
+          "default": 60000,
+          "description": "Cache timeout in milliseconds (default: 60 seconds)",
+          "minimum": 10000,
+          "maximum": 300000
+        },
+        "git-panel.search.enableFilePath": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable file path search in history (requires -- separator in search)"
+        }
+      }
     }
   },
   "scripts": {
@@ -134,20 +201,20 @@
     "@vitejs/plugin-vue": "^5.2.4",
     "@vscode/vsce": "^3.7.0",
     "@vue/tsconfig": "^0.7.0",
-    "bumpp": "^9.11.1",
+    "bumpp": "^10.4.0",
     "concurrently": "^9.2.1",
     "cross-env": "^7.0.3",
     "dayjs": "^1.11.19",
     "eslint": "^9.39.1",
     "esno": "^4.8.0",
     "ovsx": "^0.10.6",
-    "pnpm": "^9.15.9",
+    "pnpm": "^10.28.2",
     "reactive-vscode": "^0.2.22",
     "tsup": "^8.5.1",
     "typescript": "~5.6.3",
     "vite": "^6.4.1",
     "vscode-ext-gen": "^0.4.4",
     "vue-tsc": "^2.2.12",
-    "vue-virtual-scroller": "^1.1.2"
+    "vue-virtual-scroller": "^2.0.0-beta.8"
   }
 }

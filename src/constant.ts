@@ -13,6 +13,7 @@ export const CHANNEL = {
   BRANCHES: 'branches',
   AUTHORS: 'authors',
   CLEAR_SELECTED: 'clear-selected',
+  ERROR: 'error',
 }
 
 export const EXTENSION_SYMBOL = 'git-panel'
