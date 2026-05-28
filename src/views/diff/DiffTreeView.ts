@@ -9,6 +9,7 @@ import type { CommitDetails } from './types'
 
 import { useGitService } from '@/git'
 import { EXTENSION_SYMBOL } from '@/constant'
+import { logger } from '@/utils'
 
 export const useDiffTreeView = createSingletonComposable(() => {
   const git = useGitService()
@@ -95,7 +96,7 @@ export const useDiffTreeView = createSingletonComposable(() => {
       }
     }
     catch (error) {
-      console.error('Error getting commit details:', error)
+      logger.error('Error getting commit details:', error)
       commitDetailsList.value = []
       files.value = []
     }

@@ -5,7 +5,7 @@ import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
 
 import { type CommitFile, useGitService } from '@/git'
-import { parseGitStatus } from '@/utils'
+import { parseGitStatus, logger } from '@/utils'
 import { GIT_STATUS } from '@/constant'
 
 export const useFileTreeView = createSingletonComposable(() => {
@@ -136,7 +136,7 @@ export const useFileTreeView = createSingletonComposable(() => {
       }
     }
     catch (error) {
-      console.error('Error getting commit files:', error)
+      logger.error('Error getting commit files:', error)
       return { files: [], total: 0 }
     }
   }

@@ -17,6 +17,39 @@ import { formatError, logger } from '@/utils'
 
 import type { CommitGraph, GitHistoryFilter } from '@/git'
 
+type WebviewMessage =
+  | {
+      command: typeof WEBVIEW_CHANNEL.GET_HISTORY
+      filter?: GitHistoryFilter
+      forceRefresh?: boolean
+      requestId?: number
+      page?: number
+      resetPage?: boolean
+    }
+  | {
+      command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES
+    }
+  | {
+      command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS
+    }
+  | {
+      command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
+      commitHashes: string
+    }
+  | {
+      command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL
+    }
+
+function parseCommitHashes(rawHashes: string): string[] {
+  const hashes = JSON.parse(rawHashes) as unknown
+
+  if (!Array.isArray(hashes) || hashes.some(hash => typeof hash !== 'string')) {
+    throw new TypeError('Invalid commit hashes payload')
+  }
+
+  return hashes
+}
+
 function getNonce() {
   let text = ''
   const possible = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789'
@@ -102,11 +135,15 @@ export const useGitPanelView = createSingletonComposable(() => {
           Uri.joinPath(extensionUri),
         ],
       },
-      onDidReceiveMessage: async (message) => {
+      onDidReceiveMessage: async (message: WebviewMessage) => {
         switch (message.command) {
           case WEBVIEW_CHANNEL.GET_HISTORY:
             currentFilter.value = message.filter
-            await refreshHistory(message.forceRefresh, message.filter)
+            await refreshHistory(message.forceRefresh, message.filter, {
+              requestId: message.requestId,
+              page: message.page,
+              resetPage: message.resetPage,
+            })
             break
 
           case WEBVIEW_CHANNEL.GET_ALL_BRANCHES:
@@ -119,13 +156,15 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
             try {
-              const hashes: string[] = JSON.parse(message.commitHashes)
-              ;(await gitChangesProvider).refresh(hashes)
+              const hashes = parseCommitHashes(message.commitHashes)
+              await gitChangesProvider.refresh(hashes)
             }
             catch (error) {
+              const errorMessage = formatError(error)
+              logger.error('Failed to show commit details:', error)
               postMessage({
-                command: 'Failed to show commit details',
-                message: `${error}`,
+                command: CHANNEL.ERROR,
+                message: `Failed to show commit details: ${errorMessage}`,
               })
             }
             break
@@ -138,7 +177,11 @@ export const useGitPanelView = createSingletonComposable(() => {
     },
   )
 
-  async function refreshHistory(_forceRefresh: boolean = false, filter?: GitHistoryFilter) {
+  async function refreshHistory(
+    _forceRefresh: boolean = false,
+    filter?: GitHistoryFilter,
+    meta?: { requestId?: number, page?: number, resetPage?: boolean },
+  ) {
     try {
       const filterToUse = filter !== undefined ? filter : currentFilter.value
 
@@ -157,14 +200,20 @@ export const useGitPanelView = createSingletonComposable(() => {
       postMessage({
         command: CHANNEL.HISTORY,
         commits: commits.value,
+        requestId: meta?.requestId,
+        page: meta?.page,
+        resetPage: meta?.resetPage,
       })
     }
     catch (error) {
       const errorMessage = formatError(error)
       logger.error('Failed to get git history:', error)
       postMessage({
-        command: 'error',
+        command: CHANNEL.ERROR,
         message: `Failed to load git history: ${errorMessage}`,
+        requestId: meta?.requestId,
+        page: meta?.page,
+        resetPage: meta?.resetPage,
       })
     }
   }
@@ -182,7 +231,7 @@ export const useGitPanelView = createSingletonComposable(() => {
       const errorMessage = formatError(error)
       logger.error('Failed to get git branches:', error)
       postMessage({
-        command: 'error',
+        command: CHANNEL.ERROR,
         message: `Failed to load branches: ${errorMessage}`,
       })
     }
@@ -201,7 +250,7 @@ export const useGitPanelView = createSingletonComposable(() => {
       const errorMessage = formatError(error)
       logger.error('Failed to get git authors:', error)
       postMessage({
-        command: 'error',
+        command: CHANNEL.ERROR,
         message: `Failed to load authors: ${errorMessage}`,
       })
     }

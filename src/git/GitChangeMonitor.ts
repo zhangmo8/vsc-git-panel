@@ -3,6 +3,7 @@ import { createSingletonComposable, ref, useFsWatcher } from 'reactive-vscode'
 import { useGitPanelView } from '@/views/webview'
 import { config } from '@/config'
 import { useGitService } from '@/git'
+import { formatError, logger } from '@/utils'
 
 // Type for VSCode Git API repository
 interface GitRepository {
@@ -23,8 +24,14 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
   const disposables = ref<Disposable[]>([])
   const retryCount = ref(0)
   let debounceTimer: ReturnType<typeof setTimeout> | undefined
+  let retryTimer: ReturnType<typeof setTimeout> | undefined
+  let disposed = false
 
   const onGitChange = () => {
+    if (disposed) {
+      return
+    }
+
     // Clear any existing timer
     if (debounceTimer) {
       clearTimeout(debounceTimer)
@@ -35,6 +42,9 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
 
     // Clear cache and force refresh after debounce
     debounceTimer = setTimeout(() => {
+      if (disposed) {
+        return
+      }
       git.clearCache()
       webview.refreshHistory(true)
     }, debounceTime)
@@ -61,8 +71,8 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
       }
     }
     catch (err) {
-      console.error('Error getting git extension:', err)
-      throw new Error(`Git extension not found: ${err}`)
+      logger.error('Error getting git extension:', err)
+      throw new Error(`Git extension not found: ${formatError(err)}`)
     }
 
     return undefined
@@ -73,24 +83,36 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
       disposables.value.push(repo.state.onDidChange(onGitChange))
     }
     catch (error) {
-      console.error('Error setting up repository:', error)
+      logger.error('Error setting up repository:', error)
     }
   }
 
   function initializeError() {
-    console.error('Failed to get Git extension API, will retry after 5 seconds...')
+    if (disposed) {
+      return
+    }
+
+    logger.error('Failed to get Git extension API, will retry after 5 seconds...')
     if (retryCount.value === 0) {
       retryCount.value++
-      setTimeout(initialize, 5000)
+      retryTimer = setTimeout(initialize, 5000)
     }
   }
 
   async function initialize() {
+    if (disposed) {
+      return
+    }
+
     try {
       const git = await getGetInstance()
 
       if (!git) {
         initializeError()
+        return
+      }
+
+      if (disposed) {
         return
       }
 
@@ -108,7 +130,19 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
   }
 
   function dispose() {
+    disposed = true
     retryCount.value = 0
+
+    if (debounceTimer) {
+      clearTimeout(debounceTimer)
+      debounceTimer = undefined
+    }
+
+    if (retryTimer) {
+      clearTimeout(retryTimer)
+      retryTimer = undefined
+    }
+
     disposables.value.forEach(d => d.dispose())
     disposables.value = []
   }

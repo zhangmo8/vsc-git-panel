@@ -14,7 +14,7 @@ export const CHANNEL = {
   AUTHORS: 'authors',
   CLEAR_SELECTED: 'clear-selected',
   ERROR: 'error',
-}
+} as const
 
 export const EXTENSION_SYMBOL = 'git-panel'
 

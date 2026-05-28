@@ -38,7 +38,7 @@ export async function getGitPath() {
     }
   }
   catch (err) {
-    console.error(err)
+    logger.error('Failed to get git path:', err)
   }
 
   return undefined

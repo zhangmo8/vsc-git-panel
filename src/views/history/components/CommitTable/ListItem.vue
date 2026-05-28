@@ -169,40 +169,28 @@ function getRefsArray(refsString: string): RefItem[] {
 }
 
 function getRefStyle(refItem: RefItem) {
+  let color = getBranchColorFromGraphData(refItem.name)
+
   if (refItem.type === 'tag') {
-    return {
-      backgroundColor: 'var(--vscode-badge-background)',
-      borderColor: 'var(--vscode-panel-border)',
-      color: 'var(--vscode-badge-foreground)',
-      boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
-    }
+    color = 'var(--vscode-charts-yellow, #cca700)'
+  }
+  else if (refItem.type === 'head') {
+    color = 'var(--vscode-charts-red, #f14c4c)'
   }
 
-  if (refItem.type === 'head') {
-    return {
-      backgroundColor: '#e81123',
-      borderColor: '#f1707a',
-      color: '#ffffff',
-      boxShadow: '0 1px 4px rgba(232,17,35,0.4)',
-    }
-  }
-
-  const branchColor = getBranchColorFromGraphData(refItem.name)
   return {
-    backgroundColor: branchColor,
-    borderColor: branchColor,
-    color: '#ffffff',
-    boxShadow: `0 1px 4px ${branchColor}44`,
+    '--ref-color': color,
+    '--ref-bg': `color-mix(in srgb, ${color} 12%, transparent)`,
+    '--ref-border': `color-mix(in srgb, ${color} 38%, var(--vscode-panel-border))`,
   }
 }
 
 function getGhostBadgeStyle(branchName: string) {
   const color = getBranchColorFromGraphData(branchName)
   return {
-    backgroundColor: color,
-    borderColor: color,
-    color: '#ffffff',
-    boxShadow: `0 1px 4px ${color}44`,
+    '--ref-color': color,
+    '--ref-bg': 'transparent',
+    '--ref-border': `color-mix(in srgb, ${color} 28%, transparent)`,
   }
 }
 
@@ -328,7 +316,6 @@ function handleDoubleClick() {
           :has-branch-label="!!(commit.refs && commit.refs !== '')"
         />
       </div>
-      <div class="branch-graph-shadow" />
     </div>
     <span
       class="hash-col commit-cell" :style="getColumnStyle('hash')" @mouseenter="hoveredCell = 'hash'"
@@ -375,10 +362,12 @@ function handleDoubleClick() {
   box-sizing: border-box;
   position: relative;
   user-select: none;
+  color: var(--vscode-foreground);
+  transition: background-color 0.12s ease;
 }
 
 .commit-row:hover {
-  background-color: var(--vscode-list-hoverBackground);
+  background-color: color-mix(in srgb, var(--vscode-list-hoverBackground) 82%, transparent);
 }
 
 .commit-row.selected {
@@ -386,7 +375,8 @@ function handleDoubleClick() {
   color: var(--vscode-list-activeSelectionForeground);
 }
 
-.commit-row.selected .hash-col {
+.commit-row.selected .hash-col,
+.commit-row.selected .date {
   color: var(--vscode-list-activeSelectionForeground);
 }
 
@@ -394,7 +384,7 @@ function handleDoubleClick() {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding: 0px 8px;
+  padding: 0 8px;
   position: relative;
   height: 32px;
   line-height: 32px;
@@ -403,7 +393,7 @@ function handleDoubleClick() {
 
 .branch-col {
   position: relative;
-  padding: 0px;
+  padding: 0;
   z-index: 1;
   height: 32px;
 }
@@ -415,24 +405,18 @@ function handleDoubleClick() {
   position: relative;
 }
 
-.branch-graph-shadow {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  right: -2px;
-  width: 10px;
-  background: linear-gradient(90deg, rgba(0, 0, 0, 0) 0%, var(--vscode-sideBar-background) 100%);
-  pointer-events: none;
-}
-
 .hash-col {
   color: var(--vscode-gitDecoration-addedResourceForeground);
+  font-family: var(--vscode-editor-font-family);
+  font-size: 12px;
 }
 
 .commit-stats {
-  font-size: 0.85em;
-  display: flex;
-  gap: 8px;
+  font-size: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--vscode-descriptionForeground);
 }
 
 .additions {
@@ -445,12 +429,12 @@ function handleDoubleClick() {
 
 .date {
   color: var(--vscode-descriptionForeground);
-  font-size: 0.9em;
+  font-size: 12px;
 }
 
 .branch-name-col {
   white-space: normal;
-  padding: 0px;
+  padding: 0;
   display: flex;
   align-items: center;
   min-height: 32px;
@@ -462,10 +446,10 @@ function handleDoubleClick() {
 .refs-container {
   display: flex;
   flex-wrap: nowrap;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
   justify-content: flex-start;
-  padding: 4px 8px 4px 0;
+  padding: 0 8px 0 0;
   width: 100%;
   overflow: visible;
   position: relative;
@@ -475,42 +459,79 @@ function handleDoubleClick() {
 .refs-container.ghost {
   justify-content: flex-start;
   position: relative;
-  min-height: 24px;
+  min-height: 32px;
 }
 
 .ref-item {
+  --ref-color: var(--vscode-descriptionForeground);
+  --ref-bg: transparent;
+  --ref-border: var(--vscode-panel-border);
   display: inline-flex;
   align-items: center;
-  font-size: 11px;
-  padding: 2px 6px;
-  white-space: nowrap;
-  border-radius: 4px;
-  font-weight: 500;
-  line-height: 16px;
+  gap: 4px;
+  height: 20px;
   max-width: 100%;
   min-width: 0;
-  flex-shrink: 1;
+  padding: 0 7px;
+  border: 1px solid var(--ref-border);
+  border-radius: 999px;
+  background: var(--ref-bg);
+  color: var(--ref-color);
+  font-size: 11px;
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   position: relative;
   z-index: 2;
+  box-shadow: none;
+}
+
+.ref-item.head {
+  font-weight: 600;
+}
+
+.ref-item.tag {
+  font-weight: 500;
+}
+
+.ref-item.remote {
+  opacity: 0.92;
+}
+
+.ref-icons {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  opacity: 0.86;
+}
+
+.ref-icons .codicon {
+  font-size: 11px;
 }
 
 .ref-more-badge {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background-color: var(--vscode-badge-background);
-  color: var(--vscode-badge-foreground);
-  cursor: pointer;
+  height: 20px;
+  padding: 0 7px;
+  border: 1px solid var(--vscode-panel-border);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--vscode-descriptionForeground);
+  cursor: default;
   position: relative;
-  height: 16px;
-  line-height: 16px;
+  line-height: 18px;
+  font-size: 11px;
   flex-shrink: 0;
   z-index: 3;
+}
+
+.ref-more-badge:hover {
+  color: var(--vscode-foreground);
+  border-color: var(--vscode-focusBorder);
 }
 
 .ref-item.ghost {
@@ -520,7 +541,9 @@ function handleDoubleClick() {
   transform: translateY(-50%);
   opacity: 0;
   visibility: hidden;
-  transition: opacity 0.2s ease;
+  background: transparent;
+  border-style: dashed;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
   pointer-events: none;
   z-index: 1;
 }
@@ -534,25 +557,24 @@ function handleDoubleClick() {
 
 .commit-row:hover .refs-container.ghost .ref-item.ghost,
 .commit-row.selected .refs-container.ghost .ref-item.ghost {
-  opacity: 0.55;
+  opacity: 0.62;
   visibility: visible;
 }
 
 .more-refs-popup {
   display: none;
   position: absolute;
-  top: 100%;
+  top: calc(100% + 6px);
   left: 0;
   z-index: 100;
-  background-color: var(--vscode-editor-background);
+  background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-widget-border);
-  box-shadow: 0 2px 8px var(--vscode-widget-shadow);
+  box-shadow: 0 8px 24px var(--vscode-widget-shadow);
   padding: 8px;
-  border-radius: 4px;
+  border-radius: 8px;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   min-width: max-content;
-  margin-top: 4px;
 }
 
 .ref-more-badge:hover .more-refs-popup {

@@ -139,12 +139,17 @@ function handleDragEnd() {
   top: 0;
   display: flex;
   align-items: center;
-  background-color: var(--vscode-sideBar-background);
-  border-bottom: 1px solid var(--vscode-panel-border);
-  font-weight: bold;
+  height: 32px;
+  background-color: color-mix(in srgb, var(--vscode-sideBar-background) 94%, var(--vscode-editor-background));
+  border-bottom: 1px solid color-mix(in srgb, var(--vscode-panel-border) 72%, transparent);
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   width: 100%;
   box-sizing: border-box;
-  padding: 8px 0px;
+  padding: 0;
   z-index: 5;
 }
 
@@ -162,6 +167,6 @@ function handleDragEnd() {
 }
 
 .hash-col {
-  color: var(--vscode-gitDecoration-addedResourceForeground);
+  color: var(--vscode-descriptionForeground);
 }
 </style>

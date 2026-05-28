@@ -6,12 +6,20 @@ export interface CommitFile {
   oldPath?: string
 }
 
+export interface CommitDiffStats {
+  changed: number
+  insertions: number
+  deletions: number
+}
+
 export type Commit = CommitFields & ListLogLine
 
 export interface CommitFields extends DefaultLogFields {
   authorName: string
   authorEmail: string
   files?: Array<CommitFile>
+  summary?: string
+  diff?: CommitDiffStats
   parents?: Array<string>
   children?: Array<string>
   isMergeCommit?: boolean

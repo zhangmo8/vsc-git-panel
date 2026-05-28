@@ -13,9 +13,9 @@ const props = defineProps<{
 // SVG宽度将根据分支数量动态计算
 const SVG_HEIGHT = 32
 // 图表配置
-const DOT_SIZE = 10
-const LINE_WIDTH = 3
-const HORIZONTAL_SPACING = 18
+const DOT_SIZE = 8
+const LINE_WIDTH = 2
+const HORIZONTAL_SPACING = 16
 
 // 计算水平位置
 function getX(index: number) {
@@ -62,7 +62,8 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
           :y2="SVG_HEIGHT"
           :stroke="color"
           :stroke-width="LINE_WIDTH"
-          :stroke-opacity="isSelected ? 1 : 0.5"
+          :stroke-opacity="isSelected ? 0.95 : 0.42"
+          stroke-linecap="round"
         />
       </template>
 
@@ -75,7 +76,8 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
         :y2="SVG_HEIGHT / 2"
         :stroke="props.graph.node.color"
         :stroke-width="LINE_WIDTH"
-        :stroke-opacity="isSelected ? 1 : 0.5"
+        :stroke-opacity="isSelected ? 0.95 : 0.42"
+        stroke-linecap="round"
       />
 
       <!-- 2. 绘制出射连线 (Edges) -->
@@ -89,7 +91,8 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
           :y2="SVG_HEIGHT"
           :stroke="edge.color"
           :stroke-width="LINE_WIDTH"
-          :stroke-opacity="isSelected ? 1 : 0.5"
+          :stroke-opacity="isSelected ? 0.95 : 0.42"
+          stroke-linecap="round"
         />
         <!-- 曲线 (Merge/Fork) -->
         <path
@@ -97,8 +100,10 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
           :d="createCurvePath(getX(props.graph.node.x), SVG_HEIGHT / 2, getX(edge.toX), SVG_HEIGHT)"
           :stroke="edge.color"
           :stroke-width="LINE_WIDTH"
-          :stroke-opacity="isSelected ? 1 : 0.5"
+          :stroke-opacity="isSelected ? 0.95 : 0.42"
           fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
         />
       </template>
 
@@ -111,7 +116,8 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
         :y2="SVG_HEIGHT / 2"
         :stroke="props.graph.node.color"
         :stroke-width="LINE_WIDTH"
-        :stroke-opacity="isSelected ? 1 : 0.5"
+        :stroke-opacity="isSelected ? 0.95 : 0.42"
+        stroke-linecap="round"
       />
 
       <!-- 4. 绘制节点 -->
@@ -120,7 +126,7 @@ function createCurvePath(x1: number, y1: number, x2: number, y2: number) {
         :cx="getX(props.graph.node.x)"
         :cy="SVG_HEIGHT / 2"
         :r="DOT_SIZE / 2 + 2"
-        fill="var(--vscode-editor-background)"
+        fill="var(--vscode-sideBar-background)"
       />
       <!-- 内圈 (实心点) -->
       <circle

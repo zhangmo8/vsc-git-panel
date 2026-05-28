@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, toRaw } from 'vue'
+import { computed, ref, toRaw } from 'vue'
 import dayjs from 'dayjs'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
@@ -23,9 +23,6 @@ const selectedCommitHashes = defineModel<string[]>({ default: [] })
 const isDragging = ref(false)
 const selectionStart = ref<number | null>(null)
 const dragEndIndex = ref<number>(0)
-
-const observer = ref<IntersectionObserver | null>(null)
-const loadingTriggerRef = ref<HTMLElement | null>(null)
 
 const columnWidths = ref({
   branch: 120,
@@ -51,18 +48,21 @@ const branchLookup = computed<Record<string, string>>(() => {
 
 const commitData = computed(() => {
   const branches = branchLookup.value
-  return (props.commits || []).map(commit => ({
-    ...commit,
-    branchName: commit.branchName || branches[commit.hash] || '',
-    date: dayjs(commit.date).format('YYYY-MM-DD HH:mm'),
-  }))
+  return (props.commits || [])
+    .filter(commit => !!commit?.hash)
+    .map(commit => ({
+      ...commit,
+      branchName: commit.branchName || branches[commit.hash] || '',
+      date: dayjs(commit.date).format('YYYY-MM-DD HH:mm'),
+    }))
 })
 
 // 计算所有活跃分支和图表数据
 const processedRows = computed(() => {
   const hashToBranch = branchLookup.value
   const rows: {
-    commit: any
+    id: string
+    commit: Commit
     graph: {
       node: { x: number, color: string }
       edges: { toX: number, color: string, type: 'straight' | 'merge' }[]
@@ -270,6 +270,7 @@ const processedRows = computed(() => {
 
     const explicitLabel = extractBranchLabel(commit)
     rows.push({
+      id: commit.hash,
       commit,
       graph: {
         node,
@@ -392,24 +393,15 @@ function handleMouseUp() {
   selectionStart.value = null
 }
 
-onMounted(() => {
-  observer.value = new IntersectionObserver((entries) => {
-    const target = entries[0]
-    if (target.isIntersecting && props.hasMoreData && props.onLoadMore) {
-      props.onLoadMore()
-    }
-  })
+function handleVisibleRangeUpdate(_startIndex: number, endIndex: number) {
+  if (!props.hasMoreData || !props.onLoadMore)
+    return
 
-  if (loadingTriggerRef.value) {
-    observer.value.observe(loadingTriggerRef.value)
+  const preloadThreshold = 8
+  if (endIndex >= processedRows.value.length - preloadThreshold) {
+    props.onLoadMore()
   }
-})
-
-onUnmounted(() => {
-  if (observer.value) {
-    observer.value.disconnect()
-  }
-})
+}
 </script>
 
 <!-- :graph-data="graphData[index]"  -->
@@ -421,13 +413,15 @@ onUnmounted(() => {
         v-slot="{ item: row, index }"
         :items="processedRows"
         :item-size="32"
-        key-field="commit.hash"
+        key-field="id"
         class="commit-scroller"
         :buffer="200"
         :prerender="20"
+        emit-update
+        @update="handleVisibleRangeUpdate"
       >
         <ListItem
-          :key="row.commit.hash"
+          :key="row.id"
           :commit="row.commit"
           :graph="row.graph"
           :ghost-branch="row.branchHint"
@@ -443,7 +437,7 @@ onUnmounted(() => {
           @mouseover="() => isDragging && handleMouseOver(index)"
         />
       </RecycleScroller>
-      <div v-if="hasMoreData" ref="loadingTriggerRef" class="loading-trigger">
+      <div v-if="hasMoreData" class="loading-trigger">
         <div class="loading-text">
           Loading more commits...
         </div>

@@ -3,6 +3,7 @@ import { computed, onMounted, ref, toRaw, watch } from 'vue'
 
 import CommitTable from './components/CommitTable/index.vue'
 import Empty from './components/Empty.vue'
+import FilterSelect from './components/FilterSelect.vue'
 
 import { getVscodeApi } from './utils'
 
@@ -35,6 +36,7 @@ const vscode = getVscodeApi()
 window.vscode = vscode
 
 const selectedCommitHashes = ref<string[]>([])
+let latestHistoryRequestId = 0
 
 // 应用筛选
 function applyFilter(resetPage: boolean = true) {
@@ -61,11 +63,19 @@ function applyFilter(resetPage: boolean = true) {
   filter.page = currentPage.value
   filter.pageSize = pageSize.value
 
+  const requestedPage = currentPage.value
+
+  const requestId = ++latestHistoryRequestId
+
   isLoading.value = true
+  error.value = ''
   vscode.postMessage({
     command: WEBVIEW_CHANNEL.GET_HISTORY,
     forceRefresh: true,
     filter: Object.keys(filter).length > 0 ? filter : undefined,
+    requestId,
+    page: requestedPage,
+    resetPage,
   })
 }
 
@@ -116,6 +126,10 @@ window.addEventListener('message', (event: { data: any }) => {
 
   switch (message.command) {
     case CHANNEL.HISTORY: {
+      if (typeof message.requestId === 'number' && message.requestId !== latestHistoryRequestId) {
+        break
+      }
+
       commits.value = message.commits as CommitGraph
 
       const newCommits = toRaw(commits.value?.logResult.all) || []
@@ -123,7 +137,10 @@ window.addEventListener('message', (event: { data: any }) => {
       const _commits = toRaw(allCommits.value) || []
       const _operations = toRaw(allOperations.value) || []
 
-      if (currentPage.value === 1) {
+      const responsePage = typeof message.page === 'number' ? message.page : currentPage.value
+      const shouldReset = message.resetPage === true || responsePage === 1
+
+      if (shouldReset) {
         allCommits.value = [...newCommits]
         allOperations.value = [...newOperations]
       }
@@ -146,7 +163,10 @@ window.addEventListener('message', (event: { data: any }) => {
     case CHANNEL.AUTHORS:
       availableAuthors.value = message.authors || []
       break
-    case 'error':
+    case CHANNEL.ERROR:
+      if (typeof message.requestId === 'number' && message.requestId !== latestHistoryRequestId) {
+        break
+      }
       error.value = message.message
       isLoading.value = false // 出错时也停止加载状态
       break
@@ -201,38 +221,25 @@ const hasActiveFilter = computed(() => {
             </div>
           </button>
         </div>
-        <select
+        <FilterSelect
           v-model="selectedBranch"
-          class="branch-select"
+          :options="availableBranches"
+          placeholder="所有分支"
+          empty-text="没有匹配的分支"
+          all-label="所有分支"
+          width="180px"
           :disabled="isLoading"
-        >
-          <option value="">
-            所有分支
-          </option>
-          <option
-            v-for="branch in availableBranches"
-            :key="branch"
-            :value="branch"
-          >
-            {{ branch }}
-          </option>
-        </select>
-        <select
+        />
+        <FilterSelect
           v-model="selectedAuthor"
-          class="author-select"
+          :options="availableAuthors"
+          placeholder="所有作者"
+          empty-text="没有匹配的作者"
+          all-label="所有作者"
+          width="220px"
+          placement="right"
           :disabled="isLoading"
-        >
-          <option value="">
-            所有作者
-          </option>
-          <option
-            v-for="author in availableAuthors"
-            :key="author"
-            :value="author"
-          >
-            {{ author }}
-          </option>
-        </select>
+        />
         <button
           v-if="hasActiveFilter"
           class="clear-button"
@@ -295,11 +302,12 @@ const hasActiveFilter = computed(() => {
 .search-input {
   flex: 1;
   padding: 4px 36px 4px 8px;
+  min-height: 26px;
   border: 1px solid var(--vscode-input-border);
   background-color: var(--vscode-input-background);
   color: var(--vscode-input-foreground);
   outline: none;
-  border-radius: 2px;
+  border-radius: 4px;
   font-size: 13px;
   transition: border-color 0.2s ease;
 }
@@ -345,30 +353,6 @@ const hasActiveFilter = computed(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-}
-
-.branch-select,
-.author-select {
-  max-width: 180px;
-  padding: 4px 8px;
-  border: 1px solid var(--vscode-input-border);
-  background-color: var(--vscode-input-background);
-  color: var(--vscode-input-foreground);
-  outline: none;
-  border-radius: 2px;
-  font-size: 13px;
-  transition: border-color 0.2s ease;
-}
-
-.branch-select:focus,
-.author-select:focus {
-  border-color: var(--vscode-focusBorder);
-}
-
-.branch-select:disabled,
-.author-select:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
 }
 
 .clear-button {
