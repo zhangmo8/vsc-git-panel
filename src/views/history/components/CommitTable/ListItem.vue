@@ -361,16 +361,19 @@ function handleDoubleClick() {
   width: 100%;
   box-sizing: border-box;
   position: relative;
+  z-index: 0;
   user-select: none;
   color: var(--vscode-foreground);
   transition: background-color 0.12s ease;
 }
 
 .commit-row:hover {
+  z-index: 20;
   background-color: color-mix(in srgb, var(--vscode-list-hoverBackground) 82%, transparent);
 }
 
 .commit-row.selected {
+  z-index: 21;
   background-color: var(--vscode-list-activeSelectionBackground);
   color: var(--vscode-list-activeSelectionForeground);
 }
@@ -396,6 +399,7 @@ function handleDoubleClick() {
   padding: 0;
   z-index: 1;
   height: 32px;
+  pointer-events: none;
 }
 
 .branch-graph-mask {
@@ -440,7 +444,7 @@ function handleDoubleClick() {
   min-height: 32px;
   overflow: visible;
   position: relative;
-  z-index: 3;
+  z-index: 30;
 }
 
 .refs-container {
@@ -453,7 +457,7 @@ function handleDoubleClick() {
   width: 100%;
   overflow: visible;
   position: relative;
-  z-index: 3;
+  z-index: 31;
 }
 
 .refs-container.ghost {
@@ -566,7 +570,7 @@ function handleDoubleClick() {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
-  z-index: 100;
+  z-index: 40;
   background-color: var(--vscode-editorWidget-background, var(--vscode-editor-background));
   border: 1px solid var(--vscode-widget-border);
   box-shadow: 0 8px 24px var(--vscode-widget-shadow);

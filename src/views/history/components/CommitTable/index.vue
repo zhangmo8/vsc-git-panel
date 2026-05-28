@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, toRaw } from 'vue'
+import { computed, nextTick, ref, toRaw, watch } from 'vue'
 import dayjs from 'dayjs'
 import { RecycleScroller } from 'vue-virtual-scroller'
 import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
@@ -15,10 +15,13 @@ const props = defineProps<{
   graphData: GitOperation[]
   hasMoreData?: boolean
   onLoadMore?: () => void
+  scrollToHash?: string
 }>()
 
 // Selected commit hash state
 const selectedCommitHashes = defineModel<string[]>({ default: [] })
+const scrollerRef = ref<{ scrollToItem?: (index: number) => void } | null>(null)
+const lastScrolledHash = ref('')
 
 const isDragging = ref(false)
 const selectionStart = ref<number | null>(null)
@@ -402,6 +405,28 @@ function handleVisibleRangeUpdate(_startIndex: number, endIndex: number) {
     props.onLoadMore()
   }
 }
+
+watch(
+  () => [props.scrollToHash, processedRows.value.length] as const,
+  async ([targetHash]) => {
+    if (!targetHash) {
+      lastScrolledHash.value = ''
+      return
+    }
+
+    if (targetHash === lastScrolledHash.value)
+      return
+
+    const index = processedRows.value.findIndex(row => row.commit.hash === targetHash)
+    if (index < 0)
+      return
+
+    await nextTick()
+    scrollerRef.value?.scrollToItem(index)
+    lastScrolledHash.value = targetHash
+  },
+  { flush: 'post' },
+)
 </script>
 
 <!-- :graph-data="graphData[index]"  -->
@@ -410,6 +435,7 @@ function handleVisibleRangeUpdate(_startIndex: number, endIndex: number) {
     <div class="commit-list-container">
       <ColumnHeader v-model="columnWidths" class="column-header" />
       <RecycleScroller
+        ref="scrollerRef"
         v-slot="{ item: row, index }"
         :items="processedRows"
         :item-size="32"
@@ -485,6 +511,11 @@ function handleVisibleRangeUpdate(_startIndex: number, endIndex: number) {
 
 .commit-scroller :deep(.vue-recycle-scroller__item-view) {
   overflow: visible;
+  z-index: 0;
+}
+
+.commit-scroller :deep(.vue-recycle-scroller__item-view:hover) {
+  z-index: 50;
 }
 
 .commit-scroller :deep(.vue-recycle-scroller__item-wrapper) {

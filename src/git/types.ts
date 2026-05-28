@@ -62,3 +62,8 @@ export interface GitHistoryFilter {
   pageSize?: number
   filePath?: string // Search commits that modified a specific file
 }
+
+export interface GitHeadInfo {
+  hash: string
+  branch: string
+}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, toRaw, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, toRaw, watch } from 'vue'
 
 import CommitTable from './components/CommitTable/index.vue'
 import Empty from './components/Empty.vue'
@@ -36,7 +36,9 @@ const vscode = getVscodeApi()
 window.vscode = vscode
 
 const selectedCommitHashes = ref<string[]>([])
+const scrollToHash = ref<string>('')
 let latestHistoryRequestId = 0
+let suppressFilterWatch = false
 
 // 应用筛选
 function applyFilter(resetPage: boolean = true) {
@@ -113,12 +115,30 @@ function loadMoreData() {
 }
 
 watch(() => selectedBranch.value, () => {
+  if (suppressFilterWatch)
+    return
   applyFilter(true)
 })
 
 watch(() => selectedAuthor.value, () => {
+  if (suppressFilterWatch)
+    return
   applyFilter(true)
 })
+
+async function backToHead(head: { hash: string, branch: string }) {
+  suppressFilterWatch = true
+  searchText.value = head.branch ? '' : head.hash
+  selectedAuthor.value = ''
+  selectedBranch.value = head.branch || ''
+  selectedCommitHashes.value = [head.hash]
+  scrollToHash.value = ''
+  await nextTick()
+  scrollToHash.value = head.hash
+  await nextTick()
+  suppressFilterWatch = false
+  applyFilter(true)
+}
 
 // Handle messages from extension
 window.addEventListener('message', (event: { data: any }) => {
@@ -156,6 +176,9 @@ window.addEventListener('message', (event: { data: any }) => {
     }
     case CHANNEL.CLEAR_SELECTED:
       selectedCommitHashes.value = []
+      break
+    case CHANNEL.BACK_TO_HEAD:
+      void backToHead(message.head)
       break
     case CHANNEL.BRANCHES:
       availableBranches.value = message.branches || []
@@ -262,6 +285,7 @@ const hasActiveFilter = computed(() => {
         :graph-data="allOperations"
         :has-more-data="hasMoreData"
         :on-load-more="loadMoreData"
+        :scroll-to-hash="scrollToHash"
         class="git-graph-container"
       />
     </template>

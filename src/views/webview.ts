@@ -15,7 +15,7 @@ import { useGitService } from '@/git'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 import { formatError, logger } from '@/utils'
 
-import type { CommitGraph, GitHistoryFilter } from '@/git'
+import type { CommitGraph, GitHeadInfo, GitHistoryFilter } from '@/git'
 
 type WebviewMessage =
   | {
@@ -261,6 +261,14 @@ export const useGitPanelView = createSingletonComposable(() => {
     gitChangesProvider.clearSelection()
   }
 
+  async function backToHead(head: GitHeadInfo) {
+    await gitChangesProvider.refresh([head.hash])
+    postMessage({
+      command: CHANNEL.BACK_TO_HEAD,
+      head,
+    })
+  }
+
   return {
     viewType: `${EXTENSION_SYMBOL}.history` as const,
     refreshHistory,
@@ -269,5 +277,6 @@ export const useGitPanelView = createSingletonComposable(() => {
     getRepoBranches,
     getRepoAuthors,
     clearSelection,
+    backToHead,
   }
 })

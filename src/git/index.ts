@@ -2,7 +2,7 @@ import simpleGit from 'simple-git'
 import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
-import type { Commit, CommitGraph, ExtendedLogResult, GitHistoryFilter } from './types'
+import type { Commit, CommitGraph, ExtendedLogResult, GitHeadInfo, GitHistoryFilter } from './types'
 import {
   buildHistoryLogArgs,
   buildOperations,
@@ -230,6 +230,31 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  async function getHeadInfo(): Promise<GitHeadInfo | null> {
+    try {
+      const [hashResult, branchResult] = await Promise.all([
+        git.raw(['rev-parse', 'HEAD']),
+        git.raw(['branch', '--show-current']),
+      ])
+
+      const hash = hashResult.trim()
+      const branch = branchResult.trim()
+
+      if (!hash) {
+        return null
+      }
+
+      return {
+        hash,
+        branch,
+      }
+    }
+    catch (error) {
+      logger.error('Failed to get HEAD info:', error)
+      return null
+    }
+  }
+
   return {
     git,
     rootRepoPath,
@@ -238,6 +263,7 @@ export const useGitService = createSingletonComposable(() => {
     getAllBranches,
     getAllAuthors,
     getPreviousCommit,
+    getHeadInfo,
     clearCache,
   }
 })

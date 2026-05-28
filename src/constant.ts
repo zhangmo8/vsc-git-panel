@@ -13,6 +13,7 @@ export const CHANNEL = {
   BRANCHES: 'branches',
   AUTHORS: 'authors',
   CLEAR_SELECTED: 'clear-selected',
+  BACK_TO_HEAD: 'back-to-head',
   ERROR: 'error',
 } as const
 

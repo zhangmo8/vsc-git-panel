@@ -105,6 +105,12 @@
         "command": "git-panel.goToCommit",
         "title": "Go to Commit by Hash",
         "icon": "$(search)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.backToHead",
+        "title": "Back to HEAD",
+        "icon": "$(target)"
       }
     ],
     "menus": {
@@ -128,6 +134,11 @@
           "command": "git-panel.goToCommit",
           "when": "view =~ /git-panel.history/",
           "group": "navigation@6"
+        },
+        {
+          "command": "git-panel.backToHead",
+          "when": "view =~ /git-panel.history/",
+          "group": "navigation@7"
         }
       ],
       "view/item/context": [
