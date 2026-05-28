@@ -40,6 +40,7 @@
 | `git-panel.copyHash`        | GitPanel: Copy Commit Hash           |
 | `git-panel.showStats`       | GitPanel: Show Repository Statistics |
 | `git-panel.goToCommit`      | GitPanel: Go to Commit by Hash       |
+| `git-panel.backToHead`      | GitPanel: Back to HEAD               |
 
 <!-- commands -->
 
