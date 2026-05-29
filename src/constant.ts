@@ -5,6 +5,13 @@ export const WEBVIEW_CHANNEL = {
   GET_ALL_AUTHORS: 'get-all-authors',
   SHOW_COMMIT_DETAILS: 'show-commit-details',
   SHOW_CHANGES_PANEL: 'show-changes-panel',
+  GET_STASH_LIST: 'get-stash-list',
+  APPLY_STASH: 'apply-stash',
+  POP_STASH: 'pop-stash',
+  DROP_STASH: 'drop-stash',
+  CLEAR_STASH: 'clear-stash',
+  SHOW_STASH_DIFF: 'show-stash-diff',
+  SHOW_STASH_DETAILS: 'show-stash-details',
 } as const
 
 // vscode to webview channel
@@ -15,6 +22,8 @@ export const CHANNEL = {
   CLEAR_SELECTED: 'clear-selected',
   BACK_TO_HEAD: 'back-to-head',
   ERROR: 'error',
+  STASH_LIST: 'stash-list',
+  STASH_ACTION_RESULT: 'stash-action-result',
 } as const
 
 export const EXTENSION_SYMBOL = 'git-panel'

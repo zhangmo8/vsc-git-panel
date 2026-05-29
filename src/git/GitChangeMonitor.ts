@@ -47,6 +47,7 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
       }
       git.clearCache()
       webview.refreshHistory(true)
+      webview.refreshStashList()
     }, debounceTime)
   }
 
@@ -54,6 +55,12 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
 
   fsWatcher.onDidChange(onGitChange)
   fsWatcher.onDidCreate(onGitChange)
+
+  // Also watch the stash log so the stash panel refreshes when stashes are created/dropped
+  const stashWatcher = useFsWatcher('**/.git/refs/stash')
+  stashWatcher.onDidChange(onGitChange)
+  stashWatcher.onDidCreate(onGitChange)
+  stashWatcher.onDidDelete(onGitChange)
 
   async function getGetInstance(): Promise<GitAPI | undefined> {
     try {

@@ -11,12 +11,24 @@ import { useGitService } from '@/git'
 import { EXTENSION_SYMBOL } from '@/constant'
 import { logger } from '@/utils'
 
+interface StashViewState {
+  ref: string
+  hash: string
+  message: string
+  branch: string
+  date: string
+  authorName: string
+  authorEmail: string
+}
+
 export const useDiffTreeView = createSingletonComposable(() => {
   const git = useGitService()
   const fileTree = useFileTreeView()
   const selectedCommitHashes = ref<string[]>([])
   const commitDetailsList = ref<CommitDetails[]>([])
   const files = ref<TreeViewNode[]>([])
+  const stashState = ref<StashViewState | null>(null)
+  const stashFiles = ref<TreeViewNode[]>([])
 
   async function loadCommitDetails(hashes: string[]) {
     try {
@@ -103,6 +115,82 @@ export const useDiffTreeView = createSingletonComposable(() => {
   }
 
   const treeNodes = computed<TreeViewNode[]>(() => {
+    // Stash view takes precedence when active
+    if (stashState.value) {
+      const s = stashState.value
+      const totalFiles = stashFiles.value.length
+
+      return [
+        {
+          treeItem: new CommitNode(
+            'Stash',
+            `${s.ref}${s.branch ? ` · ${s.branch}` : ''}`,
+            TreeItemCollapsibleState.None,
+            'archive',
+            undefined,
+            undefined,
+          ),
+        },
+        ...(s.message
+          ? [{
+              treeItem: new CommitNode(
+                'Message',
+                s.message,
+                TreeItemCollapsibleState.None,
+                'comment',
+                undefined,
+                undefined,
+              ),
+            }]
+          : []),
+        ...(s.authorName
+          ? [{
+              treeItem: new CommitNode(
+                'Author',
+                s.authorEmail ? `${s.authorName} <${s.authorEmail}>` : s.authorName,
+                TreeItemCollapsibleState.None,
+                'person',
+                undefined,
+                undefined,
+              ),
+            }]
+          : []),
+        ...(s.date
+          ? [{
+              treeItem: new CommitNode(
+                'Date',
+                new Date(s.date).toLocaleString(),
+                TreeItemCollapsibleState.None,
+                'calendar',
+                undefined,
+                undefined,
+              ),
+            }]
+          : []),
+        {
+          treeItem: new CommitNode(
+            'Hash',
+            s.hash,
+            TreeItemCollapsibleState.None,
+            'git-commit',
+            undefined,
+            s.hash,
+          ),
+        },
+        {
+          treeItem: new CommitNode(
+            'Changed Files',
+            `${totalFiles} File${totalFiles === 1 ? '' : 's'} Changed`,
+            TreeItemCollapsibleState.Expanded,
+            'files',
+            undefined,
+            undefined,
+          ),
+          children: stashFiles.value,
+        },
+      ]
+    }
+
     if (commitDetailsList.value.length === 0)
       return []
 
@@ -163,17 +251,76 @@ export const useDiffTreeView = createSingletonComposable(() => {
     const newHashes = new Set(hashes)
 
     if (currentHashes.size === newHashes.size
-      && [...currentHashes].every(hash => newHashes.has(hash))) {
+      && [...currentHashes].every(hash => newHashes.has(hash))
+      && !stashState.value) {
       return
     }
+
+    // 退出 stash 视图
+    stashState.value = null
+    stashFiles.value = []
 
     selectedCommitHashes.value = [...hashes]
     await loadCommitDetails(hashes)
   }
 
+  /**
+   * 切换到 stash 视图：把 Git Changes 面板替换为指定 stash 的内容
+   */
+  async function refreshStash(payload: {
+    ref: string
+    message?: string
+    branch?: string
+    date?: string
+    authorName?: string
+    authorEmail?: string
+  }) {
+    try {
+      // Drop normal commit selection
+      commitDetailsList.value = []
+      files.value = []
+
+      // Resolve stash@{N} to a real commit hash so we can reuse diff plumbing
+      const realHash = await git.resolveStashHash(payload.ref)
+      if (!realHash) {
+        stashState.value = null
+        stashFiles.value = []
+        selectedCommitHashes.value = []
+        return
+      }
+
+      const stashFileList = await git.getStashFiles(payload.ref)
+
+      stashState.value = {
+        ref: payload.ref,
+        hash: realHash,
+        message: payload.message || '',
+        branch: payload.branch || '',
+        date: payload.date || '',
+        authorName: payload.authorName || '',
+        authorEmail: payload.authorEmail || '',
+      }
+
+      // The diff command short-circuits when selectedCommitHashes is empty.
+      // Set the stash's real commit hash so file clicks resolve to a normal diff.
+      selectedCommitHashes.value = [realHash]
+
+      // Reuse buildFileTree; FileNode's commitHash drives git diff on the right side.
+      stashFiles.value = fileTree.buildFileTree(stashFileList, realHash)
+    }
+    catch (error) {
+      logger.error('Error loading stash details:', error)
+      stashState.value = null
+      stashFiles.value = []
+      selectedCommitHashes.value = []
+    }
+  }
+
   function clearSelection() {
     selectedCommitHashes.value = []
     commitDetailsList.value = []
+    stashState.value = null
+    stashFiles.value = []
     refresh()
   }
 
@@ -181,6 +328,7 @@ export const useDiffTreeView = createSingletonComposable(() => {
     tree,
     selectedCommitHashes,
     refresh,
+    refreshStash,
     clearSelection,
   }
 })

@@ -1,5 +1,5 @@
 import type { Webview } from 'vscode'
-import { ExtensionMode, Uri } from 'vscode'
+import { ExtensionMode, Uri, window } from 'vscode'
 import {
   computed,
   extensionContext as context,
@@ -38,6 +38,21 @@ type WebviewMessage =
     }
   | {
       command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL
+    }
+  | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
+  | { command: typeof WEBVIEW_CHANNEL.APPLY_STASH, ref: string }
+  | { command: typeof WEBVIEW_CHANNEL.POP_STASH, ref: string }
+  | { command: typeof WEBVIEW_CHANNEL.DROP_STASH, ref: string }
+  | { command: typeof WEBVIEW_CHANNEL.CLEAR_STASH }
+  | { command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DIFF, ref: string }
+  | {
+      command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
+      ref: string
+      message?: string
+      branch?: string
+      date?: string
+      authorName?: string
+      authorEmail?: string
     }
 
 function parseCommitHashes(rawHashes: string): string[] {
@@ -172,6 +187,52 @@ export const useGitPanelView = createSingletonComposable(() => {
           case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
             await executeCommand('git-panel.changes.focus')
             break
+
+          case WEBVIEW_CHANNEL.GET_STASH_LIST:
+            await refreshStashList()
+            break
+
+          case WEBVIEW_CHANNEL.APPLY_STASH:
+            await handleStashAction(message.ref, 'apply')
+            break
+
+          case WEBVIEW_CHANNEL.POP_STASH:
+            await handleStashAction(message.ref, 'pop')
+            break
+
+          case WEBVIEW_CHANNEL.DROP_STASH:
+            await handleStashAction(message.ref, 'drop')
+            break
+
+          case WEBVIEW_CHANNEL.CLEAR_STASH:
+            await handleClearStash()
+            break
+
+          case WEBVIEW_CHANNEL.SHOW_STASH_DIFF:
+            await showStashDiff(message.ref)
+            break
+
+          case WEBVIEW_CHANNEL.SHOW_STASH_DETAILS:
+            try {
+              await gitChangesProvider.refreshStash({
+                ref: message.ref,
+                message: message.message,
+                branch: message.branch,
+                date: message.date,
+                authorName: message.authorName,
+                authorEmail: message.authorEmail,
+              })
+              await executeCommand('git-panel.changes.focus')
+            }
+            catch (error) {
+              const errorMessage = formatError(error)
+              logger.error('Failed to show stash details:', error)
+              postMessage({
+                command: CHANNEL.ERROR,
+                message: `Failed to show stash details: ${errorMessage}`,
+              })
+            }
+            break
         }
       },
     },
@@ -269,6 +330,129 @@ export const useGitPanelView = createSingletonComposable(() => {
     })
   }
 
+  async function refreshStashList() {
+    try {
+      const stashes = await git.getStashList()
+      logger.info(`refreshStashList: ${stashes.length} entries`)
+      postMessage({
+        command: CHANNEL.STASH_LIST,
+        stashes,
+      })
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get stash list:', error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to load stash list: ${errorMessage}`,
+      })
+    }
+  }
+
+  async function handleStashAction(stashRef: string, action: 'apply' | 'pop' | 'drop') {
+    try {
+      switch (action) {
+        case 'apply': {
+          await git.applyStash(stashRef)
+          const choice = await window.showInformationMessage(
+            `Stash ${stashRef} applied. Review changes in Source Control.`,
+            'Open Source Control',
+          )
+          if (choice === 'Open Source Control') {
+            await executeCommand('workbench.view.scm')
+          }
+          break
+        }
+        case 'pop': {
+          const confirm = await window.showWarningMessage(
+            `Pop ${stashRef}? The stash will be applied and then removed.`,
+            { modal: true },
+            'Pop',
+          )
+          if (confirm !== 'Pop')
+            return
+          await git.popStash(stashRef)
+          const choice = await window.showInformationMessage(
+            `Stash ${stashRef} popped. Review changes in Source Control.`,
+            'Open Source Control',
+          )
+          if (choice === 'Open Source Control') {
+            await executeCommand('workbench.view.scm')
+          }
+          break
+        }
+        case 'drop': {
+          const confirm = await window.showWarningMessage(
+            `Drop ${stashRef}? This action cannot be undone.`,
+            { modal: true },
+            'Drop',
+          )
+          if (confirm !== 'Drop')
+            return
+          await git.dropStash(stashRef)
+          window.showInformationMessage(`Stash ${stashRef} dropped`)
+          break
+        }
+      }
+      await refreshStashList()
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error(`Failed to ${action} stash:`, error)
+      const looksLikeConflict = /conflict|merge|already exists/i.test(errorMessage)
+      const hint = looksLikeConflict
+        ? ' Resolve conflicts in your working tree before retrying.'
+        : ''
+      window.showErrorMessage(`Failed to ${action} stash: ${errorMessage}${hint}`)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to ${action} stash: ${errorMessage}`,
+      })
+      // Refresh anyway: pop may have partially run
+      await refreshStashList()
+    }
+  }
+
+  async function handleClearStash() {
+    try {
+      const confirm = await window.showWarningMessage(
+        'Drop all stash entries? This action cannot be undone.',
+        { modal: true },
+        'Drop All',
+      )
+      if (confirm !== 'Drop All')
+        return
+      await git.clearStash()
+      window.showInformationMessage('All stash entries dropped')
+      await refreshStashList()
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to clear stash:', error)
+      window.showErrorMessage(`Failed to clear stash: ${errorMessage}`)
+    }
+  }
+
+  async function showStashDiff(stashRef: string) {
+    try {
+      const stat = await git.getStashStat(stashRef)
+      postMessage({
+        command: CHANNEL.STASH_ACTION_RESULT,
+        action: 'show-diff',
+        ref: stashRef,
+        stat,
+      })
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to show stash diff:', error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to load stash diff: ${errorMessage}`,
+      })
+    }
+  }
+
   return {
     viewType: `${EXTENSION_SYMBOL}.history` as const,
     refreshHistory,
@@ -278,5 +462,6 @@ export const useGitPanelView = createSingletonComposable(() => {
     getRepoAuthors,
     clearSelection,
     backToHead,
+    refreshStashList,
   }
 })

@@ -143,5 +143,6 @@ export const useFileTreeView = createSingletonComposable(() => {
 
   return {
     getChildren,
+    buildFileTree,
   }
 })
