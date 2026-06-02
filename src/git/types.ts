@@ -78,8 +78,11 @@ export interface GitLineHistory {
   authorTz?: string
   authorDate?: string
   filePath: string
+  previousHash?: string
+  previousFilePath?: string
   originalLine: number
   finalLine: number
+  previousLineText?: string
   isUncommitted: boolean
 }
 

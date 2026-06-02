@@ -11,7 +11,7 @@ import {
   isBadRevisionError,
   parseRawGitLog,
 } from './historyUtils'
-import { parseGitBlameLine } from './lineHistoryUtils'
+import { parseGitBlameLine, parseGitDiffPreviousLine } from './lineHistoryUtils'
 import { logger, parseGitStatus } from '@/utils'
 import { config } from '@/config'
 import { GIT_STATUS } from '@/constant'
@@ -277,6 +277,38 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  async function getLineHistoryForHover(filePath: string, lineNumber: number) {
+    const lineHistory = await getLineHistory(filePath, lineNumber)
+    if (!lineHistory || lineHistory.isUncommitted)
+      return lineHistory
+
+    try {
+      const previousRef = lineHistory.previousHash || `${lineHistory.hash}^`
+      const paths = [lineHistory.filePath || filePath]
+      if (lineHistory.previousFilePath && !paths.includes(lineHistory.previousFilePath))
+        paths.push(lineHistory.previousFilePath)
+
+      const rawDiff = await git.raw([
+        'diff',
+        '--unified=0',
+        '--find-renames',
+        previousRef,
+        lineHistory.hash,
+        '--',
+        ...paths,
+      ])
+
+      return {
+        ...lineHistory,
+        previousLineText: parseGitDiffPreviousLine(rawDiff, lineHistory.originalLine),
+      }
+    }
+    catch (error) {
+      logger.warn(`Failed to get previous line text for ${filePath}:${lineNumber}:`, error)
+      return lineHistory
+    }
+  }
+
   /**
    * 获取 stash 列表
    * 使用 `git stash list` 配合自定义格式以便稳定解析
@@ -473,6 +505,7 @@ export const useGitService = createSingletonComposable(() => {
     getPreviousCommit,
     getHeadInfo,
     getLineHistory,
+    getLineHistoryForHover,
     clearCache,
     getStashList,
     applyStash,

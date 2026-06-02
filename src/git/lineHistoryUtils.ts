@@ -13,7 +13,7 @@ function toIsoDate(authorTime?: number): string | undefined {
   return new Date(authorTime * 1000).toISOString()
 }
 
-export function parseGitBlameLine(rawBlame: string): GitLineHistory | null {
+export function parseGitBlameLine(rawBlame: string, previousLineText?: string): GitLineHistory | null {
   if (!rawBlame.trim())
     return null
 
@@ -41,6 +41,7 @@ export function parseGitBlameLine(rawBlame: string): GitLineHistory | null {
   const authorTime = Number.parseInt(fields.get('author-time') || '', 10)
   const isUncommitted = hash === EMPTY_HASH
   const summary = fields.get('summary') || (isUncommitted ? 'Not Committed Yet' : '(no commit message)')
+  const previous = fields.get('previous')?.match(/^([0-9a-f]{40})\s+(.+)$/i)
 
   return {
     hash,
@@ -52,8 +53,52 @@ export function parseGitBlameLine(rawBlame: string): GitLineHistory | null {
     authorTz: fields.get('author-tz') || undefined,
     authorDate: Number.isNaN(authorTime) ? undefined : toIsoDate(authorTime),
     filePath: fields.get('filename') || '',
+    previousHash: previous?.[1],
+    previousFilePath: previous?.[2],
     originalLine: Number.parseInt(originalLine, 10),
     finalLine: Number.parseInt(finalLine, 10),
+    previousLineText: previousLineText ?? undefined,
     isUncommitted,
   }
+}
+
+export function parseGitDiffPreviousLine(rawDiff: string, targetNewLine: number): string | undefined {
+  let newLine = 0
+  let addedIndex = 0
+  let removedLines: string[] = []
+
+  for (const line of rawDiff.split('\n')) {
+    const hunk = line.match(/^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@/)
+    if (hunk) {
+      newLine = Number.parseInt(hunk[1], 10)
+      addedIndex = 0
+      removedLines = []
+      continue
+    }
+
+    if (newLine === 0 || line.startsWith('\\ No newline'))
+      continue
+
+    if (line.startsWith('-') && !line.startsWith('---')) {
+      removedLines.push(line.slice(1))
+      continue
+    }
+
+    if (line.startsWith('+') && !line.startsWith('+++')) {
+      if (newLine === targetNewLine && removedLines.length > 0)
+        return removedLines[Math.min(addedIndex, removedLines.length - 1)]
+
+      newLine += 1
+      addedIndex += 1
+      continue
+    }
+
+    if (line.startsWith(' ')) {
+      newLine += 1
+      addedIndex = 0
+      removedLines = []
+    }
+  }
+
+  return undefined
 }

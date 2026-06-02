@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getBranchRefs, getPrimaryBranch, normalizeRef } from '../src/git/utils'
 import { buildHistoryLogArgs, buildOperations, createCacheKey, extractBranches, parseRawGitLog } from '../src/git/historyUtils'
-import { parseGitBlameLine } from '../src/git/lineHistoryUtils'
+import { parseGitBlameLine, parseGitDiffPreviousLine } from '../src/git/lineHistoryUtils'
 
 import type { Commit } from '../src/git/types'
 
@@ -98,7 +98,7 @@ describe('git history helpers', () => {
 })
 
 describe('git line history helpers', () => {
-  it('parses line porcelain blame output', () => {
+  it('parses line porcelain blame output with previous revision metadata', () => {
     const rawBlame = [
       'abcdef1234567890abcdef1234567890abcdef12 8 12 1',
       'author Alice',
@@ -106,11 +106,12 @@ describe('git line history helpers', () => {
       'author-time 1717200000',
       'author-tz +0800',
       'summary feat: add inline history',
+      'previous 1234567890abcdef1234567890abcdef12345678 src/old-index.ts',
       'filename src/index.ts',
       '\t  initLineHistory()',
     ].join('\n')
 
-    expect(parseGitBlameLine(rawBlame)).toMatchObject({
+    expect(parseGitBlameLine(rawBlame, '  initOldHistory()')).toMatchObject({
       hash: 'abcdef1234567890abcdef1234567890abcdef12',
       shortHash: 'abcdef1',
       summary: 'feat: add inline history',
@@ -119,8 +120,11 @@ describe('git line history helpers', () => {
       authorTime: 1717200000,
       authorTz: '+0800',
       filePath: 'src/index.ts',
+      previousHash: '1234567890abcdef1234567890abcdef12345678',
+      previousFilePath: 'src/old-index.ts',
       originalLine: 8,
       finalLine: 12,
+      previousLineText: '  initOldHistory()',
       isUncommitted: false,
     })
   })
@@ -143,5 +147,51 @@ describe('git line history helpers', () => {
       authorEmail: 'not.committed.yet',
       isUncommitted: true,
     })
+  })
+
+  it('finds the previous line text from a modified diff', () => {
+    const rawDiff = [
+      'diff --git a/a.txt b/a.txt',
+      'index 4cb29ea..ae95719 100644',
+      '--- a/a.txt',
+      '+++ b/a.txt',
+      '@@ -0,0 +1 @@',
+      '+zero',
+      '@@ -2 +3 @@ one',
+      '-two',
+      '+TWO',
+    ].join('\n')
+
+    expect(parseGitDiffPreviousLine(rawDiff, 3)).toBe('two')
+  })
+
+  it('matches the removed line by added line index in a modified hunk', () => {
+    const rawDiff = [
+      'diff --git a/a.txt b/a.txt',
+      'index 4cb29ea..ae95719 100644',
+      '--- a/a.txt',
+      '+++ b/a.txt',
+      '@@ -10,2 +10,2 @@',
+      '-old first',
+      '-old second',
+      '+new first',
+      '+new second',
+    ].join('\n')
+
+    expect(parseGitDiffPreviousLine(rawDiff, 10)).toBe('old first')
+    expect(parseGitDiffPreviousLine(rawDiff, 11)).toBe('old second')
+  })
+
+  it('leaves pure additions without previous line text', () => {
+    const rawDiff = [
+      'diff --git a/a.txt b/a.txt',
+      'index 4cb29ea..ae95719 100644',
+      '--- a/a.txt',
+      '+++ b/a.txt',
+      '@@ -0,0 +1 @@',
+      '+zero',
+    ].join('\n')
+
+    expect(parseGitDiffPreviousLine(rawDiff, 1)).toBeUndefined()
   })
 })

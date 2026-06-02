@@ -126,6 +126,14 @@ function createCommandUri(command: string, args: unknown[]): string {
   return `command:${command}?${encodeURIComponent(JSON.stringify(args))}`
 }
 
+function getDiffLines(history: GitLineHistory, lineText: string): string[] {
+  const lines = [`+ ${lineText.trimEnd()}`]
+  if (history.previousLineText !== undefined)
+    lines.unshift(`- ${history.previousLineText.trimEnd()}`)
+
+  return lines
+}
+
 function appendHoverScrollStart(markdown: MarkdownString) {
   markdown.appendMarkdown([
     `<div style="min-width: ${HOVER_MIN_WIDTH}px; max-height: ${HOVER_MAX_HEIGHT}px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-gutter: stable; padding-right: 6px;">`,
@@ -158,7 +166,7 @@ function createHoverMessage(
     markdown.appendMarkdown(`${htmlColor('Working tree changes', 'descriptionForeground')} &nbsp;&nbsp; $(file-code) \`${escapeInlineCode(relativePath)}:${lineNumber}\``)
     markdown.appendMarkdown('\n\n')
     markdown.appendMarkdown('---\n\n')
-    markdown.appendCodeblock(`+ ${lineText.trimEnd()}`, 'diff')
+    markdown.appendCodeblock(getDiffLines(history, lineText).join('\n'), 'diff')
     markdown.appendMarkdown('\n')
     markdown.appendMarkdown(`${htmlColor('Changes are currently only in the working tree.', 'descriptionForeground')}`)
     appendHoverScrollEnd(markdown)
@@ -171,6 +179,7 @@ function createHoverMessage(
     : history.authorName
   const copyUri = createCommandUri(`${EXTENSION_SYMBOL}.copyHash`, [history.hash])
   const commitLabel = `$(git-commit) ${htmlColor(history.shortHash, 'gitDecoration-addedResourceForeground')}`
+  const changesLabel = history.previousLineText === undefined ? 'Changes added in' : 'Changes'
   const avatarUrl = getAuthorAvatarUrl(history)
   const avatarHtml = avatarUrl
     ? `<img src="${escapeHtml(avatarUrl)}" width="36" height="36" style="border-radius: 50%; vertical-align: middle;" />`
@@ -189,10 +198,10 @@ function createHoverMessage(
   ].join(''))
   markdown.appendMarkdown('\n\n')
   markdown.appendMarkdown('---\n\n')
-  markdown.appendCodeblock(`+ ${lineText.trimEnd()}`, 'diff')
+  markdown.appendCodeblock(getDiffLines(history, lineText).join('\n'), 'diff')
   markdown.appendMarkdown('\n')
   markdown.appendMarkdown('---\n\n')
-  markdown.appendMarkdown(`Changes added in ${commitLabel} &nbsp;&nbsp;|&nbsp;&nbsp; [$(copy) Copy](${copyUri} "Copy Commit Hash")`)
+  markdown.appendMarkdown(`${changesLabel} ${commitLabel} &nbsp;&nbsp;|&nbsp;&nbsp; [$(copy) Copy](${copyUri} "Copy Commit Hash")`)
   markdown.appendMarkdown(`\n\n$(file-code) ${htmlColor(`${relativePath}:${lineNumber}`, 'descriptionForeground')}`)
 
   if (history.authorDate)
@@ -303,7 +312,7 @@ export function initLineHistory() {
 
     let history = getCachedHistory(cacheKey)
     if (history === undefined) {
-      history = await git.getLineHistory(relativePath, lineNumber)
+      history = await git.getLineHistoryForHover(relativePath, lineNumber)
       setCachedHistory(cacheKey, history)
     }
 
