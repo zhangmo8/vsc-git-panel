@@ -6,6 +6,7 @@ import { useDiffTreeView } from './views/diff/DiffTreeView'
 import { logger } from './utils'
 import { initCommands } from './commands'
 import { initDecoration } from './decoration'
+import { initLineHistory } from './lineHistory'
 import { useGitChangeMonitor } from './git/GitChangeMonitor'
 
 const { activate, deactivate } = defineExtension(() => {
@@ -17,6 +18,7 @@ const { activate, deactivate } = defineExtension(() => {
   const gitChangeMonitor = useGitChangeMonitor()
 
   initDecoration()
+  initLineHistory()
   initCommands()
 
   useDisposable(new Disposable(() => {

@@ -68,6 +68,24 @@ export interface GitHeadInfo {
   branch: string
 }
 
+export interface GitLineHistory {
+  hash: string
+  shortHash: string
+  summary: string
+  authorName: string
+  authorEmail: string
+  authorTime?: number
+  authorTz?: string
+  authorDate?: string
+  filePath: string
+  previousHash?: string
+  previousFilePath?: string
+  originalLine: number
+  finalLine: number
+  previousLineText?: string
+  isUncommitted: boolean
+}
+
 export interface StashEntry {
   /** stash 索引，如 0 表示 stash@{0} */
   index: number
