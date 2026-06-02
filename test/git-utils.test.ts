@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getBranchRefs, getPrimaryBranch, normalizeRef } from '../src/git/utils'
 import { buildHistoryLogArgs, buildOperations, createCacheKey, extractBranches, parseRawGitLog } from '../src/git/historyUtils'
+import { parseGitBlameLine } from '../src/git/lineHistoryUtils'
 
 import type { Commit } from '../src/git/types'
 
@@ -93,5 +94,54 @@ describe('git history helpers', () => {
         branchExplicit: false,
       },
     ])
+  })
+})
+
+describe('git line history helpers', () => {
+  it('parses line porcelain blame output', () => {
+    const rawBlame = [
+      'abcdef1234567890abcdef1234567890abcdef12 8 12 1',
+      'author Alice',
+      'author-mail <alice@example.com>',
+      'author-time 1717200000',
+      'author-tz +0800',
+      'summary feat: add inline history',
+      'filename src/index.ts',
+      '\t  initLineHistory()',
+    ].join('\n')
+
+    expect(parseGitBlameLine(rawBlame)).toMatchObject({
+      hash: 'abcdef1234567890abcdef1234567890abcdef12',
+      shortHash: 'abcdef1',
+      summary: 'feat: add inline history',
+      authorName: 'Alice',
+      authorEmail: 'alice@example.com',
+      authorTime: 1717200000,
+      authorTz: '+0800',
+      filePath: 'src/index.ts',
+      originalLine: 8,
+      finalLine: 12,
+      isUncommitted: false,
+    })
+  })
+
+  it('detects uncommitted blame rows', () => {
+    const rawBlame = [
+      '0000000000000000000000000000000000000000 3 3 1',
+      'author Not Committed Yet',
+      'author-mail <not.committed.yet>',
+      'summary Not Committed Yet',
+      'filename src/index.ts',
+      '\t  changed line',
+    ].join('\n')
+
+    expect(parseGitBlameLine(rawBlame)).toMatchObject({
+      hash: '0000000000000000000000000000000000000000',
+      shortHash: '0000000',
+      summary: 'Not Committed Yet',
+      authorName: 'Not Committed Yet',
+      authorEmail: 'not.committed.yet',
+      isUncommitted: true,
+    })
   })
 })

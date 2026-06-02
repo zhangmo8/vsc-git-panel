@@ -11,6 +11,7 @@ import {
   isBadRevisionError,
   parseRawGitLog,
 } from './historyUtils'
+import { parseGitBlameLine } from './lineHistoryUtils'
 import { logger, parseGitStatus } from '@/utils'
 import { config } from '@/config'
 import { GIT_STATUS } from '@/constant'
@@ -18,6 +19,7 @@ import { GIT_STATUS } from '@/constant'
 export * from './types'
 export * from './utils'
 export * from './historyUtils'
+export * from './lineHistoryUtils'
 
 // Cache interface
 interface CacheEntry<T> {
@@ -256,6 +258,25 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  async function getLineHistory(filePath: string, lineNumber: number) {
+    try {
+      const rawBlame = await git.raw([
+        'blame',
+        '--line-porcelain',
+        '-L',
+        `${lineNumber},${lineNumber}`,
+        '--',
+        filePath,
+      ])
+
+      return parseGitBlameLine(rawBlame)
+    }
+    catch (error) {
+      logger.warn(`Failed to get line history for ${filePath}:${lineNumber}:`, error)
+      return null
+    }
+  }
+
   /**
    * 获取 stash 列表
    * 使用 `git stash list` 配合自定义格式以便稳定解析
@@ -451,6 +472,7 @@ export const useGitService = createSingletonComposable(() => {
     getAllAuthors,
     getPreviousCommit,
     getHeadInfo,
+    getLineHistory,
     clearCache,
     getStashList,
     applyStash,
