@@ -315,8 +315,8 @@ export const useGitService = createSingletonComposable(() => {
    */
   async function getStashList(): Promise<StashEntry[]> {
     try {
-      const FIELD = String.fromCharCode(0x1f)
-      const RECORD = String.fromCharCode(0x1e)
+      const FIELD = String.fromCharCode(0x1F)
+      const RECORD = String.fromCharCode(0x1E)
       // 通过 git 自身的占位符 %x1f / %x1e 让 git 输出 ASCII 控制字符作为分隔符
       const format = `%gd%x1f%H%x1f%h%x1f%gs%x1f%aI%x1f%ar%x1f%an%x1f%ae%x1e`
 
@@ -347,10 +347,17 @@ export const useGitService = createSingletonComposable(() => {
 
         let branch = ''
         let message = subject || ''
-        const subjectMatch = subject?.match(/^(?:WIP on|On)\s+([^:]+):\s*(.*)$/)
-        if (subjectMatch) {
-          branch = subjectMatch[1].trim()
-          message = subjectMatch[2].trim()
+        const subjectPrefix = ['WIP on', 'On'].find((prefix) => {
+          const rest = subject?.slice(prefix.length)
+          return subject?.startsWith(prefix) && rest && rest.trimStart() !== rest
+        })
+        if (subjectPrefix) {
+          const content = subject.slice(subjectPrefix.length).trimStart()
+          const separatorIndex = content.indexOf(':')
+          if (separatorIndex > 0) {
+            branch = content.slice(0, separatorIndex).trim()
+            message = content.slice(separatorIndex + 1).trim()
+          }
           message = message.replace(/^[0-9a-f]{6,40}\s+/, '')
         }
 

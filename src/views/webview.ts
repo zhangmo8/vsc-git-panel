@@ -19,26 +19,26 @@ import type { CommitGraph, GitHeadInfo, GitHistoryFilter } from '@/git'
 
 type WebviewMessage =
   | {
-      command: typeof WEBVIEW_CHANNEL.GET_HISTORY
-      filter?: GitHistoryFilter
-      forceRefresh?: boolean
-      requestId?: number
-      page?: number
-      resetPage?: boolean
-    }
+    command: typeof WEBVIEW_CHANNEL.GET_HISTORY
+    filter?: GitHistoryFilter
+    forceRefresh?: boolean
+    requestId?: number
+    page?: number
+    resetPage?: boolean
+  }
   | {
-      command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES
-    }
+    command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES
+  }
   | {
-      command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS
-    }
+    command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS
+  }
   | {
-      command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
-      commitHashes: string
-    }
+    command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
+    commitHashes: string
+  }
   | {
-      command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL
-    }
+    command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL
+  }
   | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
   | { command: typeof WEBVIEW_CHANNEL.APPLY_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.POP_STASH, ref: string }
@@ -46,14 +46,14 @@ type WebviewMessage =
   | { command: typeof WEBVIEW_CHANNEL.CLEAR_STASH }
   | { command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DIFF, ref: string }
   | {
-      command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
-      ref: string
-      message?: string
-      branch?: string
-      date?: string
-      authorName?: string
-      authorEmail?: string
-    }
+    command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
+    ref: string
+    message?: string
+    branch?: string
+    date?: string
+    authorName?: string
+    authorEmail?: string
+  }
 
 function parseCommitHashes(rawHashes: string): string[] {
   const hashes = JSON.parse(rawHashes) as unknown

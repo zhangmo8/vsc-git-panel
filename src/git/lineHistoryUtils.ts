@@ -41,7 +41,13 @@ export function parseGitBlameLine(rawBlame: string, previousLineText?: string): 
   const authorTime = Number.parseInt(fields.get('author-time') || '', 10)
   const isUncommitted = hash === EMPTY_HASH
   const summary = fields.get('summary') || (isUncommitted ? 'Not Committed Yet' : '(no commit message)')
-  const previous = fields.get('previous')?.match(/^([0-9a-f]{40})\s+(.+)$/i)
+  const previousField = fields.get('previous')
+  const previousHash = previousField?.slice(0, 40)
+  const previousPath = previousField?.slice(40).trimStart()
+  const hasPreviousSeparator = previousField && previousField.slice(40) !== previousField.slice(40).trimStart()
+  const previous = previousHash && previousPath && hasPreviousSeparator && /^[0-9a-f]{40}$/i.test(previousHash)
+    ? { hash: previousHash, path: previousPath }
+    : undefined
 
   return {
     hash,
@@ -53,8 +59,8 @@ export function parseGitBlameLine(rawBlame: string, previousLineText?: string): 
     authorTz: fields.get('author-tz') || undefined,
     authorDate: Number.isNaN(authorTime) ? undefined : toIsoDate(authorTime),
     filePath: fields.get('filename') || '',
-    previousHash: previous?.[1],
-    previousFilePath: previous?.[2],
+    previousHash: previous?.hash,
+    previousFilePath: previous?.path,
     originalLine: Number.parseInt(originalLine, 10),
     finalLine: Number.parseInt(finalLine, 10),
     previousLineText: previousLineText ?? undefined,

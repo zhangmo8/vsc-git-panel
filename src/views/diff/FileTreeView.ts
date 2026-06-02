@@ -5,7 +5,7 @@ import { FileNode } from './entity/FileNode'
 import { FolderNode } from './entity/FolderNode'
 
 import { type CommitFile, useGitService } from '@/git'
-import { parseGitStatus, logger } from '@/utils'
+import { logger, parseGitStatus } from '@/utils'
 import { GIT_STATUS } from '@/constant'
 
 export const useFileTreeView = createSingletonComposable(() => {

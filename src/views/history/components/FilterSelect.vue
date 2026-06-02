@@ -127,7 +127,7 @@ onBeforeUnmount(() => {
   <div
     ref="rootRef"
     class="filter-select"
-    :class="{ open: isOpen, disabled, 'align-right': placement === 'right' }"
+    :class="{ 'open': isOpen, disabled, 'align-right': placement === 'right' }"
     :style="{ width }"
     @keydown="handleKeydown"
   >
