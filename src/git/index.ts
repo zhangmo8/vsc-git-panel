@@ -27,6 +27,14 @@ interface CacheEntry<T> {
   timestamp: number
 }
 
+interface ConfiguredRemote {
+  name: string
+  refs: {
+    fetch?: string
+    push?: string
+  }
+}
+
 const MAX_HISTORY_CACHE_SIZE = 30
 
 function createEmptyCommitGraph(): CommitGraph {
@@ -310,13 +318,54 @@ export const useGitService = createSingletonComposable(() => {
   }
 
   function findRemoteName(branchName: string, remoteNames: string[]): string | undefined {
-    return remoteNames
+    return [...remoteNames]
       .sort((a, b) => b.length - a.length)
       .find(remoteName => branchName.startsWith(`${remoteName}/`))
   }
 
+  async function getConfiguredRemotes(): Promise<ConfiguredRemote[]> {
+    const remoteMap = new Map<string, ConfiguredRemote>()
+
+    function ensureRemote(name: string) {
+      const remote = remoteMap.get(name)
+      if (remote)
+        return remote
+
+      const nextRemote: ConfiguredRemote = {
+        name,
+        refs: {},
+      }
+      remoteMap.set(name, nextRemote)
+      return nextRemote
+    }
+
+    const remotes = await git.getRemotes(true).catch(() => [])
+    for (const remote of remotes) {
+      const configuredRemote = ensureRemote(remote.name)
+      configuredRemote.refs.fetch = remote.refs.fetch || configuredRemote.refs.fetch
+      configuredRemote.refs.push = remote.refs.push || configuredRemote.refs.push
+    }
+
+    const remoteNames = await git.raw(['remote']).catch(() => '')
+    for (const name of remoteNames.split('\n').map(line => line.trim()).filter(Boolean))
+      ensureRemote(name)
+
+    const verboseRemotes = await git.raw(['remote', '-v']).catch(() => '')
+    for (const line of verboseRemotes.split('\n')) {
+      const match = line.trim().match(/^(\S+)\s+(.+)\s+\((fetch|push)\)$/)
+      if (!match)
+        continue
+
+      const [, name, url, direction] = match
+      const configuredRemote = ensureRemote(name)
+      configuredRemote.refs[direction as 'fetch' | 'push'] = url
+    }
+
+    return [...remoteMap.values()].sort((a, b) => a.name.localeCompare(b.name))
+  }
+
   async function getRemoteNames(): Promise<string[]> {
-    const remotes = await git.getRemotes()
+    const remotes = await getConfiguredRemotes()
     return remotes.map(remote => remote.name)
   }
 
@@ -359,7 +408,7 @@ export const useGitService = createSingletonComposable(() => {
 
       const [rawRefs, remotes] = await Promise.all([
         git.raw(['for-each-ref', `--format=${format}`, 'refs/heads', 'refs/remotes']),
-        git.getRemotes(true),
+        getConfiguredRemotes(),
       ])
 
       const remoteNames = remotes.map(remote => remote.name)
@@ -437,7 +486,7 @@ export const useGitService = createSingletonComposable(() => {
   }
 
   async function fetchRemote(remoteName: string): Promise<void> {
-    const remotes = await git.getRemotes()
+    const remotes = await getConfiguredRemotes()
     if (!remotes.some(remote => remote.name === remoteName)) {
       throw new Error(`Remote "${remoteName}" does not exist`)
     }

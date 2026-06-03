@@ -25,6 +25,7 @@ const emit = defineEmits<{
 const contextMenuBranch = shallowRef<GitBranchRef | null>(null)
 const contextMenuX = shallowRef(0)
 const contextMenuY = shallowRef(0)
+const collapsedGroups = shallowRef<Record<string, boolean>>({})
 
 const keyword = computed(() => props.search.trim().toLowerCase())
 
@@ -82,6 +83,17 @@ function clearSearch() {
 
 function isRemoteFetching(remoteName: string) {
   return props.fetchingRemote === remoteName
+}
+
+function isGroupCollapsed(key: string) {
+  return collapsedGroups.value[key] === true
+}
+
+function toggleGroup(key: string) {
+  collapsedGroups.value = {
+    ...collapsedGroups.value,
+    [key]: !collapsedGroups.value[key],
+  }
 }
 
 function getEventPoint(event: MouseEvent | KeyboardEvent) {
@@ -215,14 +227,22 @@ onBeforeUnmount(() => {
 
         <div v-else class="branch-sections">
           <section v-if="filteredLocalBranches.length > 0" class="branch-section">
-            <div class="branch-section-header local">
+            <button
+              class="branch-section-header local"
+              type="button"
+              :aria-expanded="!isGroupCollapsed('branches:local')"
+              @click="toggleGroup('branches:local')"
+            >
               <span class="section-title">
+                <svg class="chevron" :class="{ collapsed: isGroupCollapsed('branches:local') }" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M5.22 3.72C5.513 3.427 5.987 3.427 6.28 3.72L10.28 7.72C10.573 8.013 10.573 8.487 10.28 8.78L6.28 12.78C5.987 13.073 5.513 13.073 5.22 12.78C4.927 12.487 4.927 12.013 5.22 11.72L8.69 8.25L5.22 4.78C4.927 4.487 4.927 4.013 5.22 3.72Z" />
+                </svg>
                 <span class="section-marker local" />
                 Local Branches
               </span>
               <span class="section-count">{{ filteredLocalBranches.length }}</span>
-            </div>
-            <ul class="ref-list">
+            </button>
+            <ul v-if="!isGroupCollapsed('branches:local')" class="ref-list">
               <RefListItem
                 v-for="branch in filteredLocalBranches"
                 :key="branch.fullName"
@@ -234,14 +254,22 @@ onBeforeUnmount(() => {
           </section>
 
           <section v-if="filteredRemoteBranches.length > 0" class="branch-section">
-            <div class="branch-section-header remote">
+            <button
+              class="branch-section-header remote"
+              type="button"
+              :aria-expanded="!isGroupCollapsed('branches:remote')"
+              @click="toggleGroup('branches:remote')"
+            >
               <span class="section-title">
+                <svg class="chevron" :class="{ collapsed: isGroupCollapsed('branches:remote') }" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                  <path d="M5.22 3.72C5.513 3.427 5.987 3.427 6.28 3.72L10.28 7.72C10.573 8.013 10.573 8.487 10.28 8.78L6.28 12.78C5.987 13.073 5.513 13.073 5.22 12.78C4.927 12.487 4.927 12.013 5.22 11.72L8.69 8.25L5.22 4.78C4.927 4.487 4.927 4.013 5.22 3.72Z" />
+                </svg>
                 <span class="section-marker remote" />
                 Remote Branches
               </span>
               <span class="section-count">{{ filteredRemoteBranches.length }}</span>
-            </div>
-            <ul class="ref-list">
+            </button>
+            <ul v-if="!isGroupCollapsed('branches:remote')" class="ref-list">
               <RefListItem
                 v-for="branch in filteredRemoteBranches"
                 :key="branch.fullName"
@@ -267,8 +295,16 @@ onBeforeUnmount(() => {
         <div v-else class="remote-list">
           <section v-for="remote in filteredRemotes" :key="remote.name" class="remote-group">
             <div class="remote-header">
-              <div class="remote-header-main">
+              <button
+                class="remote-header-main"
+                type="button"
+                :aria-expanded="!isGroupCollapsed(`remote:${remote.name}`)"
+                @click="toggleGroup(`remote:${remote.name}`)"
+              >
                 <div class="remote-title">
+                  <svg class="chevron" :class="{ collapsed: isGroupCollapsed(`remote:${remote.name}`) }" width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M5.22 3.72C5.513 3.427 5.987 3.427 6.28 3.72L10.28 7.72C10.573 8.013 10.573 8.487 10.28 8.78L6.28 12.78C5.987 13.073 5.513 13.073 5.22 12.78C4.927 12.487 4.927 12.013 5.22 11.72L8.69 8.25L5.22 4.78C4.927 4.487 4.927 4.013 5.22 3.72Z" />
+                  </svg>
                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                     <path d="M1.75 2C0.784 2 0 2.784 0 3.75V11.25C0 12.216 0.784 13 1.75 13H14.25C15.216 13 16 12.216 16 11.25V3.75C16 2.784 15.216 2 14.25 2H1.75ZM1 3.75C1 3.336 1.336 3 1.75 3H14.25C14.664 3 15 3.336 15 3.75V11.25C15 11.664 14.664 12 14.25 12H1.75C1.336 12 1 11.664 1 11.25V3.75ZM3 5.5C3 5.224 3.224 5 3.5 5H12.5C12.776 5 13 5.224 13 5.5C13 5.776 12.776 6 12.5 6H3.5C3.224 6 3 5.776 3 5.5ZM3 8.5C3 8.224 3.224 8 3.5 8H9.5C9.776 8 10 8.224 10 8.5C10 8.776 9.776 9 9.5 9H3.5C3.224 9 3 8.776 3 8.5Z" />
                   </svg>
@@ -278,7 +314,7 @@ onBeforeUnmount(() => {
                 <div class="remote-url" :title="remote.fetchUrl || remote.pushUrl">
                   {{ remote.fetchUrl || remote.pushUrl || 'No URL' }}
                 </div>
-              </div>
+              </button>
               <button
                 class="remote-fetch-button"
                 :class="{ fetching: isRemoteFetching(remote.name) }"
@@ -297,7 +333,7 @@ onBeforeUnmount(() => {
               </button>
             </div>
 
-            <ul v-if="remote.branches.length > 0" class="ref-list">
+            <ul v-if="remote.branches.length > 0 && !isGroupCollapsed(`remote:${remote.name}`)" class="ref-list">
               <RefListItem
                 v-for="branch in remote.branches"
                 :key="branch.fullName"
@@ -305,6 +341,9 @@ onBeforeUnmount(() => {
                 @context-menu="openBranchContextMenu(branch, $event)"
               />
             </ul>
+            <div v-else-if="!isGroupCollapsed(`remote:${remote.name}`)" class="remote-empty-branches">
+              No remote branches fetched
+            </div>
           </section>
         </div>
       </template>
@@ -458,6 +497,7 @@ onBeforeUnmount(() => {
 }
 
 .branch-section-header {
+  width: 100%;
   min-height: 28px;
   display: flex;
   align-items: center;
@@ -470,7 +510,15 @@ onBeforeUnmount(() => {
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
   font-weight: 600;
+  text-align: left;
   text-transform: uppercase;
+  cursor: pointer;
+}
+
+.branch-section-header:hover,
+.branch-section-header:focus-visible {
+  outline: none;
+  background-color: var(--vscode-list-hoverBackground, rgba(127, 127, 127, 0.12));
 }
 
 .branch-section:first-child .branch-section-header {
@@ -485,6 +533,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
+}
+
+.chevron {
+  flex: 0 0 auto;
+  transition: transform 0.12s ease;
+  transform: rotate(90deg);
+}
+
+.chevron.collapsed {
+  transform: rotate(0deg);
 }
 
 .section-marker {
@@ -543,6 +601,22 @@ onBeforeUnmount(() => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.remote-header-main:hover .remote-title,
+.remote-header-main:focus-visible .remote-title {
+  color: var(--vscode-foreground);
+}
+
+.remote-header-main:focus-visible {
+  outline: 1px solid var(--vscode-focusBorder, #0075ca);
+  outline-offset: 2px;
 }
 
 .remote-title {
@@ -575,6 +649,12 @@ onBeforeUnmount(() => {
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
   font-family: var(--vscode-editor-font-family);
+}
+
+.remote-empty-branches {
+  padding: 8px 12px 12px 34px;
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
 }
 
 .remote-fetch-button {

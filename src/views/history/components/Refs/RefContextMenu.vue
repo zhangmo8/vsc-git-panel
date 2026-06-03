@@ -67,10 +67,17 @@ const actions = computed<MenuAction[]>(() => {
   ]
 })
 
+let lastDispatchKey = ''
+let lastDispatchAt = 0
+
 function runAction(item: MenuAction) {
-  if (item.disabled)
+  const dispatchKey = `${item.action}:${props.branch.fullName}`
+  const now = Date.now()
+  if (dispatchKey === lastDispatchKey && now - lastDispatchAt < 250)
     return
 
+  lastDispatchKey = dispatchKey
+  lastDispatchAt = now
   emit('action', item.action, props.branch)
 }
 </script>
@@ -97,16 +104,17 @@ function runAction(item: MenuAction) {
       v-for="item in actions"
       :key="item.action"
       class="context-menu-item"
-      :class="{ danger: item.danger }"
+      :class="{ danger: item.danger, unavailable: item.disabled }"
       type="button"
       role="menuitem"
-      :disabled="item.disabled"
+      :aria-disabled="item.disabled ? 'true' : undefined"
       :title="item.reason || item.label"
-      @pointerdown.stop
-      @click="runAction(item)"
+      @pointerdown.prevent.stop="runAction(item)"
+      @mousedown.prevent.stop="runAction(item)"
+      @click.prevent.stop="runAction(item)"
     >
       <span>{{ item.label }}</span>
-      <span v-if="item.disabled" class="disabled-note">Unavailable</span>
+      <span v-if="item.disabled" class="disabled-note">May fail</span>
     </button>
   </div>
 </template>
@@ -187,22 +195,21 @@ function runAction(item: MenuAction) {
   cursor: pointer;
 }
 
-.context-menu-item:hover:not(:disabled),
-.context-menu-item:focus-visible:not(:disabled) {
+.context-menu-item:hover,
+.context-menu-item:focus-visible {
   outline: none;
   background-color: var(--vscode-menu-selectionBackground, var(--vscode-list-hoverBackground));
   color: var(--vscode-menu-selectionForeground, var(--vscode-foreground));
 }
 
-.context-menu-item.danger:hover:not(:disabled),
-.context-menu-item.danger:focus-visible:not(:disabled) {
+.context-menu-item.danger:hover,
+.context-menu-item.danger:focus-visible {
   color: var(--vscode-errorForeground, #f14c4c);
 }
 
-.context-menu-item:disabled {
+.context-menu-item.unavailable {
   color: var(--vscode-disabledForeground, var(--vscode-descriptionForeground));
-  cursor: not-allowed;
-  opacity: 0.55;
+  opacity: 0.72;
 }
 
 .disabled-note {
