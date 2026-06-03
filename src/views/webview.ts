@@ -15,45 +15,48 @@ import { useGitService } from '@/git'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 import { formatError, logger } from '@/utils'
 
-import type { CommitGraph, GitHeadInfo, GitHistoryFilter } from '@/git'
+import type { CommitGraph, GitBranchAction, GitBranchRef, GitHeadInfo, GitHistoryFilter } from '@/git'
+
+interface HistoryMessage {
+  command: typeof WEBVIEW_CHANNEL.GET_HISTORY
+  filter?: GitHistoryFilter
+  forceRefresh?: boolean
+  requestId?: number
+  page?: number
+  resetPage?: boolean
+}
+
+interface CommitDetailsMessage {
+  command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
+  commitHashes: string
+}
+
+interface StashDetailsMessage {
+  command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
+  ref: string
+  message?: string
+  branch?: string
+  date?: string
+  authorName?: string
+  authorEmail?: string
+}
 
 type WebviewMessage =
-  | {
-    command: typeof WEBVIEW_CHANNEL.GET_HISTORY
-    filter?: GitHistoryFilter
-    forceRefresh?: boolean
-    requestId?: number
-    page?: number
-    resetPage?: boolean
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
-    commitHashes: string
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL
-  }
+  | HistoryMessage
+  | { command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES }
+  | { command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS }
+  | CommitDetailsMessage
+  | { command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL }
   | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
+  | { command: typeof WEBVIEW_CHANNEL.GET_GIT_REFS }
+  | { command: typeof WEBVIEW_CHANNEL.FETCH_REMOTE, remote: string }
+  | { command: typeof WEBVIEW_CHANNEL.RUN_BRANCH_ACTION, action: GitBranchAction, branch: GitBranchRef }
   | { command: typeof WEBVIEW_CHANNEL.APPLY_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.POP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.DROP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.CLEAR_STASH }
   | { command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DIFF, ref: string }
-  | {
-    command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
-    ref: string
-    message?: string
-    branch?: string
-    date?: string
-    authorName?: string
-    authorEmail?: string
-  }
+  | StashDetailsMessage
 
 function parseCommitHashes(rawHashes: string): string[] {
   const hashes = JSON.parse(rawHashes) as unknown
@@ -190,6 +193,18 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.GET_STASH_LIST:
             await refreshStashList()
+            break
+
+          case WEBVIEW_CHANNEL.GET_GIT_REFS:
+            await refreshGitRefs()
+            break
+
+          case WEBVIEW_CHANNEL.FETCH_REMOTE:
+            await fetchRemote(message.remote)
+            break
+
+          case WEBVIEW_CHANNEL.RUN_BRANCH_ACTION:
+            await handleBranchAction(message.action, message.branch)
             break
 
           case WEBVIEW_CHANNEL.APPLY_STASH:
@@ -349,6 +364,131 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  async function refreshGitRefs() {
+    try {
+      const refs = await git.getGitRefs()
+      postMessage({
+        command: CHANNEL.GIT_REFS,
+        refs,
+      })
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git refs:', error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to load branches and remotes: ${errorMessage}`,
+      })
+    }
+  }
+
+  async function fetchRemote(remoteName: string) {
+    try {
+      await git.fetchRemote(remoteName)
+      await refreshGitRefs()
+      window.showInformationMessage(`Fetched ${remoteName}`)
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error(`Failed to fetch remote ${remoteName}:`, error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to fetch ${remoteName}: ${errorMessage}`,
+      })
+      window.showErrorMessage(`Failed to fetch ${remoteName}: ${errorMessage}`)
+    }
+  }
+
+  function getBranchBaseName(branch: GitBranchRef) {
+    if (!branch.remote)
+      return branch.name
+
+    const prefix = `${branch.remote}/`
+    return branch.name.startsWith(prefix)
+      ? branch.name.slice(prefix.length)
+      : branch.name
+  }
+
+  async function promptForBranchName(title: string, value: string) {
+    const newName = await window.showInputBox({
+      title,
+      value,
+      ignoreFocusOut: true,
+      validateInput: (input) => {
+        return input.trim() ? undefined : 'Branch name is required'
+      },
+    })
+
+    return newName?.trim()
+  }
+
+  async function handleBranchAction(action: GitBranchAction, branch: GitBranchRef) {
+    try {
+      switch (action) {
+        case 'switch':
+          await git.switchBranch(branch)
+          window.showInformationMessage(`Switched to ${getBranchBaseName(branch)}`)
+          break
+
+        case 'pull':
+          await git.pullBranch(branch)
+          window.showInformationMessage(branch.type === 'remote'
+            ? `Fetched ${branch.remote || getBranchBaseName(branch)}`
+            : `Pulled ${branch.name}`)
+          break
+
+        case 'delete': {
+          const confirm = await window.showWarningMessage(
+            `Delete ${branch.type} branch "${branch.name}"? This action cannot be undone.`,
+            { modal: true },
+            'Delete',
+          )
+          if (confirm !== 'Delete')
+            return
+          await git.deleteBranch(branch)
+          window.showInformationMessage(`Deleted ${branch.name}`)
+          break
+        }
+
+        case 'rename': {
+          const newName = await promptForBranchName(`Rename ${branch.name}`, getBranchBaseName(branch))
+          if (!newName || newName === branch.name || newName === getBranchBaseName(branch))
+            return
+          await git.renameBranch(branch, newName)
+          window.showInformationMessage(`Renamed ${branch.name} to ${newName}`)
+          break
+        }
+
+        case 'clone': {
+          const newName = await promptForBranchName(`Clone ${branch.name}`, `${getBranchBaseName(branch)}-copy`)
+          if (!newName)
+            return
+          await git.cloneBranch(branch, newName)
+          window.showInformationMessage(`Created ${newName} from ${branch.name}`)
+          break
+        }
+
+        case 'push':
+          await git.pushBranch(branch)
+          window.showInformationMessage(`Pushed ${branch.name}`)
+          break
+      }
+
+      await refreshGitRefs()
+      await refreshHistory(true)
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error(`Failed to ${action} branch ${branch.name}:`, error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to ${action} ${branch.name}: ${errorMessage}`,
+      })
+      window.showErrorMessage(`Failed to ${action} ${branch.name}: ${errorMessage}`)
+      await refreshGitRefs()
+    }
+  }
+
   async function handleStashAction(stashRef: string, action: 'apply' | 'pop' | 'drop') {
     try {
       switch (action) {
@@ -463,5 +603,7 @@ export const useGitPanelView = createSingletonComposable(() => {
     clearSelection,
     backToHead,
     refreshStashList,
+    refreshGitRefs,
+    fetchRemote,
   }
 })

@@ -86,6 +86,37 @@ export interface GitLineHistory {
   isUncommitted: boolean
 }
 
+export type GitRefType = 'local' | 'remote'
+export type GitBranchAction = 'switch' | 'pull' | 'delete' | 'rename' | 'clone' | 'push'
+
+export interface GitBranchRef {
+  /** Short ref name, such as `main` or `origin/main` */
+  name: string
+  /** Full ref name, such as `refs/heads/main` */
+  fullName: string
+  type: GitRefType
+  current: boolean
+  remote?: string
+  upstream?: string
+  ahead?: number
+  behind?: number
+  commit: string
+  subject: string
+  date: string
+}
+
+export interface GitRemoteRef {
+  name: string
+  fetchUrl?: string
+  pushUrl?: string
+  branches: GitBranchRef[]
+}
+
+export interface GitRefsSummary {
+  branches: GitBranchRef[]
+  remotes: GitRemoteRef[]
+}
+
 export interface StashEntry {
   /** stash 索引，如 0 表示 stash@{0} */
   index: number

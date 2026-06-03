@@ -2,7 +2,7 @@ import simpleGit from 'simple-git'
 import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
-import type { Commit, CommitFile, CommitGraph, ExtendedLogResult, GitHeadInfo, GitHistoryFilter, StashEntry } from './types'
+import type { Commit, CommitFile, CommitGraph, ExtendedLogResult, GitBranchRef, GitHeadInfo, GitHistoryFilter, GitRefsSummary, GitRemoteRef, StashEntry } from './types'
 import {
   buildHistoryLogArgs,
   buildOperations,
@@ -309,6 +309,239 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  function findRemoteName(branchName: string, remoteNames: string[]): string | undefined {
+    return remoteNames
+      .sort((a, b) => b.length - a.length)
+      .find(remoteName => branchName.startsWith(`${remoteName}/`))
+  }
+
+  async function getRemoteNames(): Promise<string[]> {
+    const remotes = await git.getRemotes()
+    return remotes.map(remote => remote.name)
+  }
+
+  async function getRemoteParts(branch: GitBranchRef): Promise<{ remote: string, name: string }> {
+    const remoteNames = await getRemoteNames()
+    const remote = branch.remote || findRemoteName(branch.name, remoteNames)
+    if (!remote)
+      throw new Error(`Unable to resolve remote for "${branch.name}"`)
+
+    const prefix = `${remote}/`
+    return {
+      remote,
+      name: branch.name.startsWith(prefix) ? branch.name.slice(prefix.length) : branch.name,
+    }
+  }
+
+  async function getAheadBehind(branchName: string, upstream?: string): Promise<{ ahead: number, behind: number } | undefined> {
+    if (!upstream)
+      return undefined
+
+    try {
+      const raw = await git.raw(['rev-list', '--left-right', '--count', `${upstream}...${branchName}`])
+      const [behindRaw, aheadRaw] = raw.trim().split(/\s+/)
+      return {
+        ahead: Number.parseInt(aheadRaw || '0', 10),
+        behind: Number.parseInt(behindRaw || '0', 10),
+      }
+    }
+    catch (error) {
+      logger.warn(`Failed to get ahead/behind for ${branchName}:`, error)
+      return undefined
+    }
+  }
+
+  async function getGitRefs(): Promise<GitRefsSummary> {
+    try {
+      const FIELD = String.fromCharCode(0x1F)
+      const RECORD = String.fromCharCode(0x1E)
+      const format = `%(refname)${FIELD}%(refname:short)${FIELD}%(objectname:short)${FIELD}%(committerdate:iso-strict)${FIELD}%(contents:subject)${FIELD}%(upstream:short)${FIELD}%(HEAD)${RECORD}`
+
+      const [rawRefs, remotes] = await Promise.all([
+        git.raw(['for-each-ref', `--format=${format}`, 'refs/heads', 'refs/remotes']),
+        git.getRemotes(true),
+      ])
+
+      const remoteNames = remotes.map(remote => remote.name)
+      const records = rawRefs
+        .split(RECORD)
+        .map(record => record.replace(/^[\r\n]+|[\r\n]+$/g, ''))
+        .filter(Boolean)
+
+      const branches: GitBranchRef[] = []
+
+      for (const record of records) {
+        const [fullName, shortName, commit, date, subject, upstream, headMarker] = record.split(FIELD)
+
+        if (!fullName || !shortName)
+          continue
+
+        if (/^refs\/remotes\/[^/]+\/HEAD$/.test(fullName))
+          continue
+
+        const type = fullName.startsWith('refs/remotes/') ? 'remote' : 'local'
+        const remote = type === 'remote' ? findRemoteName(shortName, remoteNames) : undefined
+        const branch: GitBranchRef = {
+          name: shortName,
+          fullName,
+          type,
+          remote,
+          current: headMarker === '*',
+          upstream: upstream || undefined,
+          commit: commit || '',
+          subject: subject || '',
+          date: date || '',
+        }
+
+        branches.push(branch)
+      }
+
+      const branchesWithTracking = await Promise.all(
+        branches.map(async (branch) => {
+          if (branch.type !== 'local' || !branch.upstream)
+            return branch
+
+          const tracking = await getAheadBehind(branch.name, branch.upstream)
+          return tracking ? { ...branch, ...tracking } : branch
+        }),
+      )
+
+      const remoteRefs: GitRemoteRef[] = remotes.map((remote) => {
+        const remoteBranches = branchesWithTracking
+          .filter(branch => branch.type === 'remote' && branch.remote === remote.name)
+          .sort((a, b) => a.name.localeCompare(b.name))
+
+        return {
+          name: remote.name,
+          fetchUrl: remote.refs.fetch,
+          pushUrl: remote.refs.push,
+          branches: remoteBranches,
+        }
+      })
+
+      return {
+        branches: branchesWithTracking.sort((a, b) => {
+          if (a.current !== b.current)
+            return a.current ? -1 : 1
+          if (a.type !== b.type)
+            return a.type === 'local' ? -1 : 1
+          return a.name.localeCompare(b.name)
+        }),
+        remotes: remoteRefs.sort((a, b) => a.name.localeCompare(b.name)),
+      }
+    }
+    catch (error) {
+      logger.error('Failed to get git refs:', error)
+      throw error
+    }
+  }
+
+  async function fetchRemote(remoteName: string): Promise<void> {
+    const remotes = await git.getRemotes()
+    if (!remotes.some(remote => remote.name === remoteName)) {
+      throw new Error(`Remote "${remoteName}" does not exist`)
+    }
+
+    await git.raw(['fetch', remoteName, '--prune'])
+    clearCache()
+  }
+
+  async function switchBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.type === 'local') {
+      await git.checkout(branch.name)
+      clearCache()
+      return
+    }
+
+    const { name } = await getRemoteParts(branch)
+    const localBranches = await git.branchLocal()
+    if (localBranches.all.includes(name)) {
+      await git.checkout(name)
+    }
+    else {
+      await git.raw(['checkout', '--track', '-b', name, branch.name])
+    }
+    clearCache()
+  }
+
+  async function pullBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.type === 'remote') {
+      const { remote } = await getRemoteParts(branch)
+      await fetchRemote(remote)
+      return
+    }
+
+    if (!branch.upstream)
+      throw new Error(`Branch "${branch.name}" has no upstream`)
+
+    await git.checkout(branch.name)
+    await git.raw(['pull', '--ff-only'])
+    clearCache()
+  }
+
+  async function deleteBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.current)
+      throw new Error('Cannot delete the current branch')
+
+    if (branch.type === 'remote') {
+      const { remote, name } = await getRemoteParts(branch)
+      await git.raw(['push', remote, '--delete', name])
+      await fetchRemote(remote)
+      return
+    }
+
+    await git.raw(['branch', '-d', branch.name])
+    clearCache()
+  }
+
+  async function renameBranch(branch: GitBranchRef, newName: string): Promise<void> {
+    if (branch.type === 'remote') {
+      const { remote, name } = await getRemoteParts(branch)
+      await git.raw(['push', remote, `${branch.fullName}:refs/heads/${newName}`])
+      await git.raw(['push', remote, '--delete', name])
+      await fetchRemote(remote)
+      return
+    }
+
+    await git.raw(['branch', '-m', branch.name, newName])
+    clearCache()
+  }
+
+  async function cloneBranch(branch: GitBranchRef, newName: string): Promise<void> {
+    if (branch.type === 'remote') {
+      await git.raw(['checkout', '--track', '-b', newName, branch.name])
+    }
+    else {
+      await git.checkoutBranch(newName, branch.name)
+    }
+    clearCache()
+  }
+
+  async function pushBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.type !== 'local')
+      throw new Error('Only local branches can be pushed')
+
+    if (branch.upstream) {
+      const remoteNames = await getRemoteNames()
+      const remote = findRemoteName(branch.upstream, remoteNames)
+      if (!remote)
+        throw new Error(`Unable to resolve upstream remote for "${branch.upstream}"`)
+
+      const remoteBranch = branch.upstream.slice(`${remote}/`.length)
+      await git.raw(['push', remote, `${branch.name}:${remoteBranch}`])
+    }
+    else {
+      const remoteNames = await getRemoteNames()
+      const remote = remoteNames[0]
+      if (!remote)
+        throw new Error('No remote is configured')
+
+      await git.raw(['push', '-u', remote, branch.name])
+    }
+
+    clearCache()
+  }
+
   /**
    * 获取 stash 列表
    * 使用 `git stash list` 配合自定义格式以便稳定解析
@@ -513,6 +746,14 @@ export const useGitService = createSingletonComposable(() => {
     getHeadInfo,
     getLineHistory,
     getLineHistoryForHover,
+    getGitRefs,
+    fetchRemote,
+    switchBranch,
+    pullBranch,
+    deleteBranch,
+    renameBranch,
+    cloneBranch,
+    pushBranch,
     clearCache,
     getStashList,
     applyStash,
