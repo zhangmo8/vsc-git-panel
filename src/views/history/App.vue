@@ -52,6 +52,7 @@ const expandedStashRef = ref<string>('')
 const gitRefs = ref<GitRefsSummary>({ branches: [], remotes: [] })
 const isRefsLoading = ref<boolean>(false)
 const refsSearch = ref<string>('')
+const fetchingRemote = ref<string>('')
 
 const filteredStashes = computed(() => {
   const keyword = stashSearch.value.trim().toLowerCase()
@@ -79,6 +80,11 @@ function loadStashList() {
 function loadGitRefs() {
   isRefsLoading.value = true
   vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_GIT_REFS })
+}
+
+function fetchRemote(remoteName: string) {
+  fetchingRemote.value = remoteName
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.FETCH_REMOTE, remote: remoteName })
 }
 
 function clearStashSearch() {
@@ -301,6 +307,7 @@ window.addEventListener('message', (event: { data: any }) => {
     case CHANNEL.GIT_REFS:
       gitRefs.value = (message.refs as GitRefsSummary) || { branches: [], remotes: [] }
       isRefsLoading.value = false
+      fetchingRemote.value = ''
       break
     case CHANNEL.ERROR:
       if (typeof message.requestId === 'number' && message.requestId !== latestHistoryRequestId) {
@@ -310,6 +317,7 @@ window.addEventListener('message', (event: { data: any }) => {
       isLoading.value = false // 出错时也停止加载状态
       isStashLoading.value = false
       isRefsLoading.value = false
+      fetchingRemote.value = ''
       break
   }
 })
@@ -571,7 +579,9 @@ const hasActiveFilter = computed(() => {
         :branches="gitRefs.branches"
         :remotes="gitRefs.remotes"
         :loading="isRefsLoading"
+        :fetching-remote="fetchingRemote"
         @refresh="loadGitRefs"
+        @fetch-remote="fetchRemote"
         @select-branch="showBranchHistory"
       />
     </template>
@@ -584,7 +594,9 @@ const hasActiveFilter = computed(() => {
         :branches="gitRefs.branches"
         :remotes="gitRefs.remotes"
         :loading="isRefsLoading"
+        :fetching-remote="fetchingRemote"
         @refresh="loadGitRefs"
+        @fetch-remote="fetchRemote"
         @select-branch="showBranchHistory"
       />
     </template>

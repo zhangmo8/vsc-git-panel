@@ -49,6 +49,7 @@ type WebviewMessage =
   | { command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL }
   | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
   | { command: typeof WEBVIEW_CHANNEL.GET_GIT_REFS }
+  | { command: typeof WEBVIEW_CHANNEL.FETCH_REMOTE, remote: string }
   | { command: typeof WEBVIEW_CHANNEL.APPLY_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.POP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.DROP_STASH, ref: string }
@@ -195,6 +196,10 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.GET_GIT_REFS:
             await refreshGitRefs()
+            break
+
+          case WEBVIEW_CHANNEL.FETCH_REMOTE:
+            await fetchRemote(message.remote)
             break
 
           case WEBVIEW_CHANNEL.APPLY_STASH:
@@ -372,6 +377,23 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  async function fetchRemote(remoteName: string) {
+    try {
+      await git.fetchRemote(remoteName)
+      await refreshGitRefs()
+      window.showInformationMessage(`Fetched ${remoteName}`)
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error(`Failed to fetch remote ${remoteName}:`, error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to fetch ${remoteName}: ${errorMessage}`,
+      })
+      window.showErrorMessage(`Failed to fetch ${remoteName}: ${errorMessage}`)
+    }
+  }
+
   async function handleStashAction(stashRef: string, action: 'apply' | 'pop' | 'drop') {
     try {
       switch (action) {
@@ -487,5 +509,6 @@ export const useGitPanelView = createSingletonComposable(() => {
     backToHead,
     refreshStashList,
     refreshGitRefs,
+    fetchRemote,
   }
 })

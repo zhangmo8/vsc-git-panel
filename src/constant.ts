@@ -7,6 +7,7 @@ export const WEBVIEW_CHANNEL = {
   SHOW_CHANGES_PANEL: 'show-changes-panel',
   GET_STASH_LIST: 'get-stash-list',
   GET_GIT_REFS: 'get-git-refs',
+  FETCH_REMOTE: 'fetch-remote',
   APPLY_STASH: 'apply-stash',
   POP_STASH: 'pop-stash',
   DROP_STASH: 'drop-stash',

@@ -337,7 +337,7 @@ export const useGitService = createSingletonComposable(() => {
     try {
       const FIELD = String.fromCharCode(0x1F)
       const RECORD = String.fromCharCode(0x1E)
-      const format = `%(refname)%x1f%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:iso-strict)%x1f%(contents:subject)%x1f%(upstream:short)%x1f%(HEAD)%x1e`
+      const format = `%(refname)${FIELD}%(refname:short)${FIELD}%(objectname:short)${FIELD}%(committerdate:iso-strict)${FIELD}%(contents:subject)${FIELD}%(upstream:short)${FIELD}%(HEAD)${RECORD}`
 
       const [rawRefs, remotes] = await Promise.all([
         git.raw(['for-each-ref', `--format=${format}`, 'refs/heads', 'refs/remotes']),
@@ -414,8 +414,18 @@ export const useGitService = createSingletonComposable(() => {
     }
     catch (error) {
       logger.error('Failed to get git refs:', error)
-      return { branches: [], remotes: [] }
+      throw error
     }
+  }
+
+  async function fetchRemote(remoteName: string): Promise<void> {
+    const remotes = await git.getRemotes()
+    if (!remotes.some(remote => remote.name === remoteName)) {
+      throw new Error(`Remote "${remoteName}" does not exist`)
+    }
+
+    await git.raw(['fetch', remoteName, '--prune'])
+    clearCache()
   }
 
   /**
@@ -623,6 +633,7 @@ export const useGitService = createSingletonComposable(() => {
     getLineHistory,
     getLineHistoryForHover,
     getGitRefs,
+    fetchRemote,
     clearCache,
     getStashList,
     applyStash,

@@ -10,12 +10,14 @@ const props = defineProps<{
   branches: GitBranchRef[]
   remotes: GitRemoteRef[]
   loading?: boolean
+  fetchingRemote?: string
   search: string
 }>()
 
 const emit = defineEmits<{
   (e: 'update:search', value: string): void
   (e: 'refresh'): void
+  (e: 'fetchRemote', remoteName: string): void
   (e: 'selectBranch', branch: GitBranchRef): void
 }>()
 
@@ -62,6 +64,10 @@ const hasSearch = computed(() => !!keyword.value)
 
 function clearSearch() {
   emit('update:search', '')
+}
+
+function isRemoteFetching(remoteName: string) {
+  return props.fetchingRemote === remoteName
 }
 </script>
 
@@ -146,16 +152,29 @@ function clearSearch() {
         <div v-else class="remote-list">
           <section v-for="remote in filteredRemotes" :key="remote.name" class="remote-group">
             <div class="remote-header">
-              <div class="remote-title">
+              <div class="remote-header-main">
+                <div class="remote-title">
+                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                    <path d="M1.75 2C0.784 2 0 2.784 0 3.75V11.25C0 12.216 0.784 13 1.75 13H14.25C15.216 13 16 12.216 16 11.25V3.75C16 2.784 15.216 2 14.25 2H1.75ZM1 3.75C1 3.336 1.336 3 1.75 3H14.25C14.664 3 15 3.336 15 3.75V11.25C15 11.664 14.664 12 14.25 12H1.75C1.336 12 1 11.664 1 11.25V3.75ZM3 5.5C3 5.224 3.224 5 3.5 5H12.5C12.776 5 13 5.224 13 5.5C13 5.776 12.776 6 12.5 6H3.5C3.224 6 3 5.776 3 5.5ZM3 8.5C3 8.224 3.224 8 3.5 8H9.5C9.776 8 10 8.224 10 8.5C10 8.776 9.776 9 9.5 9H3.5C3.224 9 3 8.776 3 8.5Z" />
+                  </svg>
+                  <span>{{ remote.name }}</span>
+                  <span class="branch-count">{{ remote.branches.length }}</span>
+                </div>
+                <div class="remote-url" :title="remote.fetchUrl || remote.pushUrl">
+                  {{ remote.fetchUrl || remote.pushUrl || 'No URL' }}
+                </div>
+              </div>
+              <button
+                class="remote-fetch-button"
+                :class="{ fetching: isRemoteFetching(remote.name) }"
+                :disabled="loading || !!fetchingRemote"
+                :title="`Fetch ${remote.name}`"
+                @click="emit('fetchRemote', remote.name)"
+              >
                 <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                  <path d="M1.75 2C0.784 2 0 2.784 0 3.75V11.25C0 12.216 0.784 13 1.75 13H14.25C15.216 13 16 12.216 16 11.25V3.75C16 2.784 15.216 2 14.25 2H1.75ZM1 3.75C1 3.336 1.336 3 1.75 3H14.25C14.664 3 15 3.336 15 3.75V11.25C15 11.664 14.664 12 14.25 12H1.75C1.336 12 1 11.664 1 11.25V3.75ZM3 5.5C3 5.224 3.224 5 3.5 5H12.5C12.776 5 13 5.224 13 5.5C13 5.776 12.776 6 12.5 6H3.5C3.224 6 3 5.776 3 5.5ZM3 8.5C3 8.224 3.224 8 3.5 8H9.5C9.776 8 10 8.224 10 8.5C10 8.776 9.776 9 9.5 9H3.5C3.224 9 3 8.776 3 8.5Z" />
+                  <path d="M8 1C8.276 1 8.5 1.224 8.5 1.5V9.293L11.146 6.646C11.341 6.451 11.658 6.451 11.853 6.646C12.048 6.841 12.048 7.158 11.853 7.353L8.353 10.853C8.158 11.048 7.842 11.048 7.647 10.853L4.147 7.353C3.952 7.158 3.952 6.841 4.147 6.646C4.342 6.451 4.659 6.451 4.854 6.646L7.5 9.293V1.5C7.5 1.224 7.724 1 8 1ZM2.5 11C2.776 11 3 11.224 3 11.5V13H13V11.5C13 11.224 13.224 11 13.5 11C13.776 11 14 11.224 14 11.5V13.25C14 13.664 13.664 14 13.25 14H2.75C2.336 14 2 13.664 2 13.25V11.5C2 11.224 2.224 11 2.5 11Z" />
                 </svg>
-                <span>{{ remote.name }}</span>
-                <span class="branch-count">{{ remote.branches.length }}</span>
-              </div>
-              <div class="remote-url" :title="remote.fetchUrl || remote.pushUrl">
-                {{ remote.fetchUrl || remote.pushUrl || 'No URL' }}
-              </div>
+              </button>
             </div>
 
             <ul v-if="remote.branches.length > 0" class="ref-list">
@@ -316,10 +335,18 @@ function clearSearch() {
 
 .remote-header {
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
   gap: 4px;
   padding: 9px 12px 7px;
   background-color: var(--vscode-sideBarSectionHeader-background, rgba(127, 127, 127, 0.08));
+}
+
+.remote-header-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .remote-title {
@@ -352,6 +379,33 @@ function clearSearch() {
   color: var(--vscode-descriptionForeground);
   font-size: 11px;
   font-family: var(--vscode-editor-font-family);
+}
+
+.remote-fetch-button {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background-color: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
+  cursor: pointer;
+}
+
+.remote-fetch-button:hover:not(:disabled) {
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+}
+
+.remote-fetch-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.remote-fetch-button.fetching svg {
+  animation: spin 0.8s linear infinite;
 }
 
 .loading-state,
