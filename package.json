@@ -30,7 +30,7 @@
     "res/*"
   ],
   "engines": {
-    "vscode": "^1.106.0"
+    "vscode": "^1.105.0"
   },
   "activationEvents": [
     "onStartupFinished"
@@ -208,7 +208,7 @@
     "@antfu/eslint-config": "^2.27.3",
     "@antfu/ni": "^0.22.4",
     "@types/node": "^22.19.1",
-    "@types/vscode": "^1.106.1",
+    "@types/vscode": "1.105.0",
     "@vitejs/plugin-vue": "^5.2.4",
     "@vscode/vsce": "^3.9.1",
     "@vue/tsconfig": "^0.7.0",

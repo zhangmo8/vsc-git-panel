@@ -25,8 +25,8 @@ importers:
         specifier: ^22.19.1
         version: 22.19.1
       '@types/vscode':
-        specifier: ^1.106.1
-        version: 1.106.1
+        specifier: 1.105.0
+        version: 1.105.0
       '@vitejs/plugin-vue':
         specifier: ^5.2.4
         version: 5.2.4(vite@6.4.1(@types/node@22.19.1)(jiti@2.6.1)(tsx@4.20.6)(yaml@2.9.0))(vue@3.5.24(typescript@5.6.3))
@@ -62,7 +62,7 @@ importers:
         version: 10.34.1
       reactive-vscode:
         specifier: ^0.2.22
-        version: 0.2.22(@types/vscode@1.106.1)
+        version: 0.2.22(@types/vscode@1.105.0)
       tsup:
         specifier: ^8.5.1
         version: 8.5.1(jiti@2.6.1)(postcss@8.5.6)(tsx@4.20.6)(typescript@5.6.3)(yaml@2.9.0)
@@ -1097,8 +1097,8 @@ packages:
   '@types/unist@2.0.11':
     resolution: {integrity: sha512-CmBKiL6NNo/OqgmMn95Fk9Whlp2mtvIv+KNpQKN2F4SjvrEesubTRWGYSg+BnWZOnlCaSTU1sMpsBOzgbYhnsA==}
 
-  '@types/vscode@1.106.1':
-    resolution: {integrity: sha512-R/HV8u2h8CAddSbX8cjpdd7B8/GnE4UjgjpuGuHcbp1xV6yh4OeqU4L1pKjlwujCrSFS0MOpwJAIs/NexMB1fQ==}
+  '@types/vscode@1.105.0':
+    resolution: {integrity: sha512-Lotk3CTFlGZN8ray4VxJE7axIyLZZETQJVWi/lYoUVQuqfRxlQhVOfoejsD2V3dVXPSbS15ov5ZyowMAzgUqcw==}
 
   '@typescript-eslint/eslint-plugin@8.47.0':
     resolution: {integrity: sha512-fe0rz9WJQ5t2iaLfdbDc9T80GJy0AeO453q8C3YCilnGozvOyCG5t+EZtg7j7D88+c3FipfP/x+wzGnh1xp8ZA==}
@@ -4574,7 +4574,7 @@ snapshots:
 
   '@types/unist@2.0.11': {}
 
-  '@types/vscode@1.106.1': {}
+  '@types/vscode@1.105.0': {}
 
   '@typescript-eslint/eslint-plugin@8.47.0(@typescript-eslint/parser@8.47.0(eslint@9.39.1(jiti@2.6.1))(typescript@5.6.3))(eslint@9.39.1(jiti@2.6.1))(typescript@5.6.3)':
     dependencies:
@@ -6706,10 +6706,10 @@ snapshots:
       strip-json-comments: 2.0.1
     optional: true
 
-  reactive-vscode@0.2.22(@types/vscode@1.106.1):
+  reactive-vscode@0.2.22(@types/vscode@1.105.0):
     dependencies:
       '@reactive-vscode/reactivity': 0.2.22
-      '@types/vscode': 1.106.1
+      '@types/vscode': 1.105.0
 
   read-pkg-up@7.0.1:
     dependencies:
