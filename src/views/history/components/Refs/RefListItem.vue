@@ -130,7 +130,6 @@ function handleKeydown(event: KeyboardEvent) {
   background: transparent;
   color: var(--vscode-foreground);
   text-align: left;
-  cursor: context-menu;
 }
 
 .ref-row:hover {

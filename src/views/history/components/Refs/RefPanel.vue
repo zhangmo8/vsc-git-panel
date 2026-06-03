@@ -125,11 +125,8 @@ function closeContextMenu() {
   contextMenuBranch.value = null
 }
 
-function runBranchAction(action: GitBranchAction) {
-  if (!contextMenuBranch.value)
-    return
-
-  emit('branchAction', action, contextMenuBranch.value)
+function runBranchAction(action: GitBranchAction, branch: GitBranchRef) {
+  emit('branchAction', action, branch)
   closeContextMenu()
 }
 
