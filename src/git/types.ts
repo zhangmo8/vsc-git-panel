@@ -87,6 +87,7 @@ export interface GitLineHistory {
 }
 
 export type GitRefType = 'local' | 'remote'
+export type GitBranchAction = 'switch' | 'pull' | 'delete' | 'rename' | 'clone' | 'push'
 
 export interface GitBranchRef {
   /** Short ref name, such as `main` or `origin/main` */

@@ -11,7 +11,7 @@ import { getVscodeApi } from './utils'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, CommitGraph, GitBranchRef, GitHistoryFilter, GitOperation, GitRefsSummary, StashEntry } from '@/git'
+import type { Commit, CommitGraph, GitBranchAction, GitBranchRef, GitHistoryFilter, GitOperation, GitRefsSummary, StashEntry } from '@/git'
 
 declare global {
   interface Window {
@@ -87,6 +87,10 @@ function fetchRemote(remoteName: string) {
   vscode.postMessage({ command: WEBVIEW_CHANNEL.FETCH_REMOTE, remote: remoteName })
 }
 
+function runBranchAction(action: GitBranchAction, branch: GitBranchRef) {
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.RUN_BRANCH_ACTION, action, branch })
+}
+
 function clearStashSearch() {
   stashSearch.value = ''
 }
@@ -134,20 +138,6 @@ function switchTab(tab: TabKey) {
   else if (tab === 'branches' || tab === 'remotes') {
     loadGitRefs()
   }
-}
-
-async function showBranchHistory(branch: GitBranchRef) {
-  activeTab.value = 'history'
-  expandedStashRef.value = ''
-  selectedCommitHashes.value = []
-
-  suppressFilterWatch = true
-  searchText.value = ''
-  selectedAuthor.value = ''
-  selectedBranch.value = branch.name
-  await nextTick()
-  suppressFilterWatch = false
-  applyFilter(true)
 }
 
 // 应用筛选
@@ -582,7 +572,7 @@ const hasActiveFilter = computed(() => {
         :fetching-remote="fetchingRemote"
         @refresh="loadGitRefs"
         @fetch-remote="fetchRemote"
-        @select-branch="showBranchHistory"
+        @branch-action="runBranchAction"
       />
     </template>
 
@@ -597,7 +587,7 @@ const hasActiveFilter = computed(() => {
         :fetching-remote="fetchingRemote"
         @refresh="loadGitRefs"
         @fetch-remote="fetchRemote"
-        @select-branch="showBranchHistory"
+        @branch-action="runBranchAction"
       />
     </template>
 

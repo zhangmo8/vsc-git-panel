@@ -15,7 +15,7 @@ import { useGitService } from '@/git'
 import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
 import { formatError, logger } from '@/utils'
 
-import type { CommitGraph, GitHeadInfo, GitHistoryFilter } from '@/git'
+import type { CommitGraph, GitBranchAction, GitBranchRef, GitHeadInfo, GitHistoryFilter } from '@/git'
 
 interface HistoryMessage {
   command: typeof WEBVIEW_CHANNEL.GET_HISTORY
@@ -50,6 +50,7 @@ type WebviewMessage =
   | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
   | { command: typeof WEBVIEW_CHANNEL.GET_GIT_REFS }
   | { command: typeof WEBVIEW_CHANNEL.FETCH_REMOTE, remote: string }
+  | { command: typeof WEBVIEW_CHANNEL.RUN_BRANCH_ACTION, action: GitBranchAction, branch: GitBranchRef }
   | { command: typeof WEBVIEW_CHANNEL.APPLY_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.POP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.DROP_STASH, ref: string }
@@ -200,6 +201,10 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.FETCH_REMOTE:
             await fetchRemote(message.remote)
+            break
+
+          case WEBVIEW_CHANNEL.RUN_BRANCH_ACTION:
+            await handleBranchAction(message.action, message.branch)
             break
 
           case WEBVIEW_CHANNEL.APPLY_STASH:
@@ -391,6 +396,96 @@ export const useGitPanelView = createSingletonComposable(() => {
         message: `Failed to fetch ${remoteName}: ${errorMessage}`,
       })
       window.showErrorMessage(`Failed to fetch ${remoteName}: ${errorMessage}`)
+    }
+  }
+
+  function getBranchBaseName(branch: GitBranchRef) {
+    if (!branch.remote)
+      return branch.name
+
+    const prefix = `${branch.remote}/`
+    return branch.name.startsWith(prefix)
+      ? branch.name.slice(prefix.length)
+      : branch.name
+  }
+
+  async function promptForBranchName(title: string, value: string) {
+    const newName = await window.showInputBox({
+      title,
+      value,
+      ignoreFocusOut: true,
+      validateInput: (input) => {
+        return input.trim() ? undefined : 'Branch name is required'
+      },
+    })
+
+    return newName?.trim()
+  }
+
+  async function handleBranchAction(action: GitBranchAction, branch: GitBranchRef) {
+    try {
+      switch (action) {
+        case 'switch':
+          await git.switchBranch(branch)
+          window.showInformationMessage(`Switched to ${getBranchBaseName(branch)}`)
+          break
+
+        case 'pull':
+          await git.pullBranch(branch)
+          window.showInformationMessage(branch.type === 'remote'
+            ? `Fetched ${branch.remote || getBranchBaseName(branch)}`
+            : `Pulled ${branch.name}`)
+          break
+
+        case 'delete': {
+          const confirm = await window.showWarningMessage(
+            `Delete ${branch.type} branch "${branch.name}"? This action cannot be undone.`,
+            { modal: true },
+            'Delete',
+          )
+          if (confirm !== 'Delete')
+            return
+          await git.deleteBranch(branch)
+          window.showInformationMessage(`Deleted ${branch.name}`)
+          break
+        }
+
+        case 'rename': {
+          const newName = await promptForBranchName(`Rename ${branch.name}`, getBranchBaseName(branch))
+          if (!newName || newName === branch.name || newName === getBranchBaseName(branch))
+            return
+          await git.renameBranch(branch, newName)
+          window.showInformationMessage(`Renamed ${branch.name} to ${newName}`)
+          break
+        }
+
+        case 'clone': {
+          const newName = await promptForBranchName(`Clone ${branch.name}`, `${getBranchBaseName(branch)}-copy`)
+          if (!newName)
+            return
+          await git.cloneBranch(branch, newName)
+          window.showInformationMessage(`Created ${newName} from ${branch.name}`)
+          break
+        }
+
+        case 'push':
+          await git.pushBranch(branch)
+          window.showInformationMessage(`Pushed ${branch.name}`)
+          break
+      }
+
+      await refreshGitRefs()
+      await refreshHistory(true)
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error(`Failed to ${action} branch ${branch.name}:`, error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to ${action} ${branch.name}: ${errorMessage}`,
+      })
+      window.showErrorMessage(`Failed to ${action} ${branch.name}: ${errorMessage}`)
+      await refreshGitRefs()
     }
   }
 

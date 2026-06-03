@@ -315,6 +315,24 @@ export const useGitService = createSingletonComposable(() => {
       .find(remoteName => branchName.startsWith(`${remoteName}/`))
   }
 
+  async function getRemoteNames(): Promise<string[]> {
+    const remotes = await git.getRemotes()
+    return remotes.map(remote => remote.name)
+  }
+
+  async function getRemoteParts(branch: GitBranchRef): Promise<{ remote: string, name: string }> {
+    const remoteNames = await getRemoteNames()
+    const remote = branch.remote || findRemoteName(branch.name, remoteNames)
+    if (!remote)
+      throw new Error(`Unable to resolve remote for "${branch.name}"`)
+
+    const prefix = `${remote}/`
+    return {
+      remote,
+      name: branch.name.startsWith(prefix) ? branch.name.slice(prefix.length) : branch.name,
+    }
+  }
+
   async function getAheadBehind(branchName: string, upstream?: string): Promise<{ ahead: number, behind: number } | undefined> {
     if (!upstream)
       return undefined
@@ -425,6 +443,102 @@ export const useGitService = createSingletonComposable(() => {
     }
 
     await git.raw(['fetch', remoteName, '--prune'])
+    clearCache()
+  }
+
+  async function switchBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.type === 'local') {
+      await git.checkout(branch.name)
+      clearCache()
+      return
+    }
+
+    const { name } = await getRemoteParts(branch)
+    const localBranches = await git.branchLocal()
+    if (localBranches.all.includes(name)) {
+      await git.checkout(name)
+    }
+    else {
+      await git.raw(['checkout', '--track', '-b', name, branch.name])
+    }
+    clearCache()
+  }
+
+  async function pullBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.type === 'remote') {
+      const { remote } = await getRemoteParts(branch)
+      await fetchRemote(remote)
+      return
+    }
+
+    if (!branch.upstream)
+      throw new Error(`Branch "${branch.name}" has no upstream`)
+
+    await git.checkout(branch.name)
+    await git.raw(['pull', '--ff-only'])
+    clearCache()
+  }
+
+  async function deleteBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.current)
+      throw new Error('Cannot delete the current branch')
+
+    if (branch.type === 'remote') {
+      const { remote, name } = await getRemoteParts(branch)
+      await git.raw(['push', remote, '--delete', name])
+      await fetchRemote(remote)
+      return
+    }
+
+    await git.raw(['branch', '-d', branch.name])
+    clearCache()
+  }
+
+  async function renameBranch(branch: GitBranchRef, newName: string): Promise<void> {
+    if (branch.type === 'remote') {
+      const { remote, name } = await getRemoteParts(branch)
+      await git.raw(['push', remote, `${branch.fullName}:refs/heads/${newName}`])
+      await git.raw(['push', remote, '--delete', name])
+      await fetchRemote(remote)
+      return
+    }
+
+    await git.raw(['branch', '-m', branch.name, newName])
+    clearCache()
+  }
+
+  async function cloneBranch(branch: GitBranchRef, newName: string): Promise<void> {
+    if (branch.type === 'remote') {
+      await git.raw(['checkout', '--track', '-b', newName, branch.name])
+    }
+    else {
+      await git.checkoutBranch(newName, branch.name)
+    }
+    clearCache()
+  }
+
+  async function pushBranch(branch: GitBranchRef): Promise<void> {
+    if (branch.type !== 'local')
+      throw new Error('Only local branches can be pushed')
+
+    if (branch.upstream) {
+      const remoteNames = await getRemoteNames()
+      const remote = findRemoteName(branch.upstream, remoteNames)
+      if (!remote)
+        throw new Error(`Unable to resolve upstream remote for "${branch.upstream}"`)
+
+      const remoteBranch = branch.upstream.slice(`${remote}/`.length)
+      await git.raw(['push', remote, `${branch.name}:${remoteBranch}`])
+    }
+    else {
+      const remoteNames = await getRemoteNames()
+      const remote = remoteNames[0]
+      if (!remote)
+        throw new Error('No remote is configured')
+
+      await git.raw(['push', '-u', remote, branch.name])
+    }
+
     clearCache()
   }
 
@@ -634,6 +748,12 @@ export const useGitService = createSingletonComposable(() => {
     getLineHistoryForHover,
     getGitRefs,
     fetchRemote,
+    switchBranch,
+    pullBranch,
+    deleteBranch,
+    renameBranch,
+    cloneBranch,
+    pushBranch,
     clearCache,
     getStashList,
     applyStash,

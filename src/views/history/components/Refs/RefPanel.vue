@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, onBeforeUnmount, onMounted, shallowRef } from 'vue'
 
+import RefContextMenu from './RefContextMenu.vue'
 import RefListItem from './RefListItem.vue'
 
-import type { GitBranchRef, GitRemoteRef } from '@/git'
+import type { GitBranchAction, GitBranchRef, GitRemoteRef } from '@/git'
 
 const props = defineProps<{
   mode: 'branches' | 'remotes'
@@ -18,8 +19,12 @@ const emit = defineEmits<{
   (e: 'update:search', value: string): void
   (e: 'refresh'): void
   (e: 'fetchRemote', remoteName: string): void
-  (e: 'selectBranch', branch: GitBranchRef): void
+  (e: 'branchAction', action: GitBranchAction, branch: GitBranchRef): void
 }>()
+
+const contextMenuBranch = shallowRef<GitBranchRef | null>(null)
+const contextMenuX = shallowRef(0)
+const contextMenuY = shallowRef(0)
 
 const keyword = computed(() => props.search.trim().toLowerCase())
 
@@ -39,6 +44,14 @@ function branchMatches(branch: GitBranchRef) {
 
 const filteredBranches = computed(() => {
   return props.branches.filter(branchMatches)
+})
+
+const filteredLocalBranches = computed(() => {
+  return filteredBranches.value.filter(branch => branch.type === 'local')
+})
+
+const filteredRemoteBranches = computed(() => {
+  return filteredBranches.value.filter(branch => branch.type === 'remote')
 })
 
 const filteredRemotes = computed(() => {
@@ -61,6 +74,7 @@ const filteredRemotes = computed(() => {
 const localCount = computed(() => props.branches.filter(branch => branch.type === 'local').length)
 const remoteBranchCount = computed(() => props.branches.filter(branch => branch.type === 'remote').length)
 const hasSearch = computed(() => !!keyword.value)
+const hasContextMenu = computed(() => contextMenuBranch.value !== null)
 
 function clearSearch() {
   emit('update:search', '')
@@ -69,6 +83,80 @@ function clearSearch() {
 function isRemoteFetching(remoteName: string) {
   return props.fetchingRemote === remoteName
 }
+
+function getEventPoint(event: MouseEvent | KeyboardEvent) {
+  if ('clientX' in event && (event.clientX !== 0 || event.clientY !== 0)) {
+    return {
+      x: event.clientX,
+      y: event.clientY,
+    }
+  }
+
+  const target = event.currentTarget as HTMLElement | null
+  const rect = target?.getBoundingClientRect()
+  if (!rect) {
+    return {
+      x: 12,
+      y: 12,
+    }
+  }
+
+  return {
+    x: rect.left + 24,
+    y: rect.top + 24,
+  }
+}
+
+function openBranchContextMenu(branch: GitBranchRef, event: MouseEvent | KeyboardEvent) {
+  event.preventDefault()
+
+  const point = getEventPoint(event)
+  const menuWidth = 198
+  const menuHeight = 246
+  const maxX = Math.max(8, window.innerWidth - menuWidth - 8)
+  const maxY = Math.max(8, window.innerHeight - menuHeight - 8)
+
+  contextMenuBranch.value = branch
+  contextMenuX.value = Math.max(8, Math.min(point.x, maxX))
+  contextMenuY.value = Math.max(8, Math.min(point.y, maxY))
+}
+
+function closeContextMenu() {
+  contextMenuBranch.value = null
+}
+
+function runBranchAction(action: GitBranchAction) {
+  if (!contextMenuBranch.value)
+    return
+
+  emit('branchAction', action, contextMenuBranch.value)
+  closeContextMenu()
+}
+
+function handleDocumentClick() {
+  closeContextMenu()
+}
+
+function handleDocumentScroll() {
+  closeContextMenu()
+}
+
+function handleDocumentKeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape')
+    closeContextMenu()
+}
+
+onMounted(() => {
+  document.addEventListener('click', handleDocumentClick)
+  document.addEventListener('scroll', handleDocumentScroll, true)
+  document.addEventListener('keydown', handleDocumentKeydown)
+})
+
+onBeforeUnmount(() => {
+  document.removeEventListener('click', handleDocumentClick)
+  document.removeEventListener('scroll', handleDocumentScroll, true)
+  document.removeEventListener('keydown', handleDocumentKeydown)
+})
 </script>
 
 <template>
@@ -128,15 +216,45 @@ function isRemoteFetching(remoteName: string) {
           </div>
         </div>
 
-        <ul v-else class="ref-list">
-          <RefListItem
-            v-for="branch in filteredBranches"
-            :key="branch.fullName"
-            :branch="branch"
-            show-remote
-            @select="emit('selectBranch', branch)"
-          />
-        </ul>
+        <div v-else class="branch-sections">
+          <section v-if="filteredLocalBranches.length > 0" class="branch-section">
+            <div class="branch-section-header local">
+              <span class="section-title">
+                <span class="section-marker local" />
+                Local Branches
+              </span>
+              <span class="section-count">{{ filteredLocalBranches.length }}</span>
+            </div>
+            <ul class="ref-list">
+              <RefListItem
+                v-for="branch in filteredLocalBranches"
+                :key="branch.fullName"
+                :branch="branch"
+                show-remote
+                @context-menu="openBranchContextMenu(branch, $event)"
+              />
+            </ul>
+          </section>
+
+          <section v-if="filteredRemoteBranches.length > 0" class="branch-section">
+            <div class="branch-section-header remote">
+              <span class="section-title">
+                <span class="section-marker remote" />
+                Remote Branches
+              </span>
+              <span class="section-count">{{ filteredRemoteBranches.length }}</span>
+            </div>
+            <ul class="ref-list">
+              <RefListItem
+                v-for="branch in filteredRemoteBranches"
+                :key="branch.fullName"
+                :branch="branch"
+                show-remote
+                @context-menu="openBranchContextMenu(branch, $event)"
+              />
+            </ul>
+          </section>
+        </div>
       </template>
 
       <template v-else>
@@ -168,10 +286,15 @@ function isRemoteFetching(remoteName: string) {
                 class="remote-fetch-button"
                 :class="{ fetching: isRemoteFetching(remote.name) }"
                 :disabled="loading || !!fetchingRemote"
-                :title="`Fetch ${remote.name}`"
+                :title="isRemoteFetching(remote.name) ? `Fetching ${remote.name}...` : `Fetch ${remote.name}`"
+                :aria-label="isRemoteFetching(remote.name) ? `Fetching ${remote.name}` : `Fetch ${remote.name}`"
+                :data-tooltip="isRemoteFetching(remote.name) ? `Fetching ${remote.name}...` : `Fetch ${remote.name}`"
                 @click="emit('fetchRemote', remote.name)"
               >
-                <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+                <svg v-if="isRemoteFetching(remote.name)" class="spinner-icon" width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <circle cx="8" cy="8" r="5.5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-dasharray="24" stroke-dashoffset="8" />
+                </svg>
+                <svg v-else width="13" height="13" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                   <path d="M8 1C8.276 1 8.5 1.224 8.5 1.5V9.293L11.146 6.646C11.341 6.451 11.658 6.451 11.853 6.646C12.048 6.841 12.048 7.158 11.853 7.353L8.353 10.853C8.158 11.048 7.842 11.048 7.647 10.853L4.147 7.353C3.952 7.158 3.952 6.841 4.147 6.646C4.342 6.451 4.659 6.451 4.854 6.646L7.5 9.293V1.5C7.5 1.224 7.724 1 8 1ZM2.5 11C2.776 11 3 11.224 3 11.5V13H13V11.5C13 11.224 13.224 11 13.5 11C13.776 11 14 11.224 14 11.5V13.25C14 13.664 13.664 14 13.25 14H2.75C2.336 14 2 13.664 2 13.25V11.5C2 11.224 2.224 11 2.5 11Z" />
                 </svg>
               </button>
@@ -182,13 +305,22 @@ function isRemoteFetching(remoteName: string) {
                 v-for="branch in remote.branches"
                 :key="branch.fullName"
                 :branch="branch"
-                @select="emit('selectBranch', branch)"
+                @context-menu="openBranchContextMenu(branch, $event)"
               />
             </ul>
           </section>
         </div>
       </template>
     </div>
+
+    <RefContextMenu
+      v-if="hasContextMenu && contextMenuBranch"
+      :branch="contextMenuBranch"
+      :x="contextMenuX"
+      :y="contextMenuY"
+      @action="runBranchAction"
+      @close="closeContextMenu"
+    />
   </div>
 </template>
 
@@ -320,6 +452,73 @@ function isRemoteFetching(remoteName: string) {
   scrollbar-width: thin;
 }
 
+.branch-sections {
+  padding: 4px 0 8px;
+}
+
+.branch-section + .branch-section {
+  margin-top: 8px;
+}
+
+.branch-section-header {
+  min-height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 12px;
+  border-top: 1px solid var(--vscode-panel-border);
+  border-bottom: 1px solid var(--vscode-panel-border);
+  background-color: var(--vscode-sideBarSectionHeader-background, rgba(127, 127, 127, 0.08));
+  color: var(--vscode-descriptionForeground);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.branch-section:first-child .branch-section-header {
+  border-top: 0;
+}
+
+.section-title {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.section-marker {
+  flex: 0 0 auto;
+  width: 7px;
+  height: 14px;
+  border-radius: 2px;
+}
+
+.section-marker.local {
+  background-color: var(--vscode-focusBorder, #0075ca);
+}
+
+.section-marker.remote {
+  background-color: var(--vscode-gitDecoration-addedResourceForeground, #1db35b);
+}
+
+.section-count {
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+  border-radius: 9px;
+  background-color: var(--vscode-badge-background, rgba(127, 127, 127, 0.18));
+  color: var(--vscode-badge-foreground, var(--vscode-foreground));
+  font-size: 10.5px;
+}
+
 .ref-list {
   margin: 0;
   padding: 4px 0;
@@ -382,6 +581,7 @@ function isRemoteFetching(remoteName: string) {
 }
 
 .remote-fetch-button {
+  position: relative;
   flex: 0 0 auto;
   width: 26px;
   height: 24px;
@@ -395,8 +595,38 @@ function isRemoteFetching(remoteName: string) {
   cursor: pointer;
 }
 
-.remote-fetch-button:hover:not(:disabled) {
+.remote-fetch-button::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  max-width: 240px;
+  padding: 4px 8px;
+  border: 1px solid var(--vscode-menu-border, var(--vscode-panel-border));
+  border-radius: 4px;
+  background-color: var(--vscode-editorHoverWidget-background, var(--vscode-menu-background));
+  color: var(--vscode-editorHoverWidget-foreground, var(--vscode-foreground));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.24);
+  font-size: 11px;
+  line-height: 16px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.remote-fetch-button:hover:not(:disabled),
+.remote-fetch-button:focus-visible:not(:disabled) {
+  outline: none;
   background-color: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+}
+
+.remote-fetch-button:hover:not(:disabled)::after,
+.remote-fetch-button:focus-visible:not(:disabled)::after {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .remote-fetch-button:disabled {
@@ -404,7 +634,7 @@ function isRemoteFetching(remoteName: string) {
   cursor: not-allowed;
 }
 
-.remote-fetch-button.fetching svg {
+.spinner-icon {
   animation: spin 0.8s linear infinite;
 }
 
