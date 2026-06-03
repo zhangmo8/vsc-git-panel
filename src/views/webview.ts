@@ -17,43 +17,44 @@ import { formatError, logger } from '@/utils'
 
 import type { CommitGraph, GitHeadInfo, GitHistoryFilter } from '@/git'
 
+interface HistoryMessage {
+  command: typeof WEBVIEW_CHANNEL.GET_HISTORY
+  filter?: GitHistoryFilter
+  forceRefresh?: boolean
+  requestId?: number
+  page?: number
+  resetPage?: boolean
+}
+
+interface CommitDetailsMessage {
+  command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
+  commitHashes: string
+}
+
+interface StashDetailsMessage {
+  command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
+  ref: string
+  message?: string
+  branch?: string
+  date?: string
+  authorName?: string
+  authorEmail?: string
+}
+
 type WebviewMessage =
-  | {
-    command: typeof WEBVIEW_CHANNEL.GET_HISTORY
-    filter?: GitHistoryFilter
-    forceRefresh?: boolean
-    requestId?: number
-    page?: number
-    resetPage?: boolean
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS
-    commitHashes: string
-  }
-  | {
-    command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL
-  }
+  | HistoryMessage
+  | { command: typeof WEBVIEW_CHANNEL.GET_ALL_BRANCHES }
+  | { command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS }
+  | CommitDetailsMessage
+  | { command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL }
   | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
+  | { command: typeof WEBVIEW_CHANNEL.GET_GIT_REFS }
   | { command: typeof WEBVIEW_CHANNEL.APPLY_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.POP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.DROP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.CLEAR_STASH }
   | { command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DIFF, ref: string }
-  | {
-    command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DETAILS
-    ref: string
-    message?: string
-    branch?: string
-    date?: string
-    authorName?: string
-    authorEmail?: string
-  }
+  | StashDetailsMessage
 
 function parseCommitHashes(rawHashes: string): string[] {
   const hashes = JSON.parse(rawHashes) as unknown
@@ -190,6 +191,10 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.GET_STASH_LIST:
             await refreshStashList()
+            break
+
+          case WEBVIEW_CHANNEL.GET_GIT_REFS:
+            await refreshGitRefs()
             break
 
           case WEBVIEW_CHANNEL.APPLY_STASH:
@@ -349,6 +354,24 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  async function refreshGitRefs() {
+    try {
+      const refs = await git.getGitRefs()
+      postMessage({
+        command: CHANNEL.GIT_REFS,
+        refs,
+      })
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get git refs:', error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to load branches and remotes: ${errorMessage}`,
+      })
+    }
+  }
+
   async function handleStashAction(stashRef: string, action: 'apply' | 'pop' | 'drop') {
     try {
       switch (action) {
@@ -463,5 +486,6 @@ export const useGitPanelView = createSingletonComposable(() => {
     clearSelection,
     backToHead,
     refreshStashList,
+    refreshGitRefs,
   }
 })

@@ -12,7 +12,7 @@ export interface CommitDiffStats {
   deletions: number
 }
 
-export type Commit = CommitFields & ListLogLine
+export type Commit = CommitFields & Omit<ListLogLine, 'diff'>
 
 export interface CommitFields extends DefaultLogFields {
   authorName: string
@@ -84,6 +84,36 @@ export interface GitLineHistory {
   finalLine: number
   previousLineText?: string
   isUncommitted: boolean
+}
+
+export type GitRefType = 'local' | 'remote'
+
+export interface GitBranchRef {
+  /** Short ref name, such as `main` or `origin/main` */
+  name: string
+  /** Full ref name, such as `refs/heads/main` */
+  fullName: string
+  type: GitRefType
+  current: boolean
+  remote?: string
+  upstream?: string
+  ahead?: number
+  behind?: number
+  commit: string
+  subject: string
+  date: string
+}
+
+export interface GitRemoteRef {
+  name: string
+  fetchUrl?: string
+  pushUrl?: string
+  branches: GitBranchRef[]
+}
+
+export interface GitRefsSummary {
+  branches: GitBranchRef[]
+  remotes: GitRemoteRef[]
 }
 
 export interface StashEntry {

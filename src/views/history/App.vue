@@ -4,13 +4,14 @@ import { computed, nextTick, onMounted, ref, toRaw, watch } from 'vue'
 import CommitTable from './components/CommitTable/index.vue'
 import Empty from './components/Empty.vue'
 import FilterSelect from './components/FilterSelect.vue'
+import RefPanel from './components/Refs/RefPanel.vue'
 import StashItem from './components/StashItem.vue'
 
 import { getVscodeApi } from './utils'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, CommitGraph, GitHistoryFilter, GitOperation, StashEntry } from '@/git'
+import type { Commit, CommitGraph, GitBranchRef, GitHistoryFilter, GitOperation, GitRefsSummary, StashEntry } from '@/git'
 
 declare global {
   interface Window {
@@ -42,12 +43,15 @@ let latestHistoryRequestId = 0
 let suppressFilterWatch = false
 
 // ---------------- Stash 面板 ----------------
-type TabKey = 'history' | 'stash'
+type TabKey = 'history' | 'stash' | 'branches' | 'remotes'
 const activeTab = ref<TabKey>('history')
 const stashes = ref<StashEntry[]>([])
 const isStashLoading = ref<boolean>(false)
 const stashSearch = ref<string>('')
 const expandedStashRef = ref<string>('')
+const gitRefs = ref<GitRefsSummary>({ branches: [], remotes: [] })
+const isRefsLoading = ref<boolean>(false)
+const refsSearch = ref<string>('')
 
 const filteredStashes = computed(() => {
   const keyword = stashSearch.value.trim().toLowerCase()
@@ -70,6 +74,11 @@ const hasStashFilter = computed(() => !!stashSearch.value.trim())
 function loadStashList() {
   isStashLoading.value = true
   vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_STASH_LIST })
+}
+
+function loadGitRefs() {
+  isRefsLoading.value = true
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_GIT_REFS })
 }
 
 function clearStashSearch() {
@@ -116,6 +125,23 @@ function switchTab(tab: TabKey) {
   if (tab === 'stash') {
     loadStashList()
   }
+  else if (tab === 'branches' || tab === 'remotes') {
+    loadGitRefs()
+  }
+}
+
+async function showBranchHistory(branch: GitBranchRef) {
+  activeTab.value = 'history'
+  expandedStashRef.value = ''
+  selectedCommitHashes.value = []
+
+  suppressFilterWatch = true
+  searchText.value = ''
+  selectedAuthor.value = ''
+  selectedBranch.value = branch.name
+  await nextTick()
+  suppressFilterWatch = false
+  applyFilter(true)
 }
 
 // 应用筛选
@@ -272,6 +298,10 @@ window.addEventListener('message', (event: { data: any }) => {
       stashes.value = (message.stashes as StashEntry[]) || []
       isStashLoading.value = false
       break
+    case CHANNEL.GIT_REFS:
+      gitRefs.value = (message.refs as GitRefsSummary) || { branches: [], remotes: [] }
+      isRefsLoading.value = false
+      break
     case CHANNEL.ERROR:
       if (typeof message.requestId === 'number' && message.requestId !== latestHistoryRequestId) {
         break
@@ -279,6 +309,7 @@ window.addEventListener('message', (event: { data: any }) => {
       error.value = message.message
       isLoading.value = false // 出错时也停止加载状态
       isStashLoading.value = false
+      isRefsLoading.value = false
       break
   }
 })
@@ -289,6 +320,7 @@ onMounted(() => {
   applyFilter(true)
   // 后台预拉取 stash 列表，切到 stash tab 时无感
   loadStashList()
+  loadGitRefs()
 })
 
 const transformedCommits = computed(() => {
@@ -325,6 +357,28 @@ const hasActiveFilter = computed(() => {
         </svg>
         <span>Stash</span>
         <span v-if="stashes.length > 0" class="tab-badge">{{ stashes.length }}</span>
+      </button>
+      <button
+        class="tab"
+        :class="{ active: activeTab === 'branches' }"
+        @click="switchTab('branches')"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M14 5.5C14 4.121 12.879 3 11.5 3C10.121 3 9 4.121 9 5.5C9 6.682 9.826 7.669 10.93 7.928C10.744 8.546 10.177 9 9.5 9H6.5C5.935 9 5.419 9.195 5 9.512V4.949C6.14 4.717 7 3.707 7 2.5C7 1.121 5.879 0 4.5 0C3.121 0 2 1.121 2 2.5C2 3.708 2.86 4.717 4 4.949V11.05C2.86 11.282 2 12.292 2 13.499C2 14.878 3.121 15.999 4.5 15.999C5.879 15.999 7 14.878 7 13.499C7 12.317 6.174 11.33 5.07 11.071C5.256 10.453 5.823 9.999 6.5 9.999H9.5C10.723 9.999 11.74 9.115 11.954 7.953C13.116 7.738 14 6.723 14 5.5ZM3 2.5C3 1.673 3.673 1 4.5 1C5.327 1 6 1.673 6 2.5C6 3.327 5.327 4 4.5 4C3.673 4 3 3.327 3 2.5ZM6 13.5C6 14.327 5.327 15 4.5 15C3.673 15 3 14.327 3 13.5C3 12.673 3.673 12 4.5 12C5.327 12 6 12.673 6 13.5ZM11.5 7C10.673 7 10 6.327 10 5.5C10 4.673 10.673 4 11.5 4C12.327 4 13 4.673 13 5.5C13 6.327 12.327 7 11.5 7Z" />
+        </svg>
+        <span>Branches</span>
+        <span v-if="gitRefs.branches.length > 0" class="tab-badge">{{ gitRefs.branches.length }}</span>
+      </button>
+      <button
+        class="tab"
+        :class="{ active: activeTab === 'remotes' }"
+        @click="switchTab('remotes')"
+      >
+        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+          <path d="M1.75 2C0.784 2 0 2.784 0 3.75V11.25C0 12.216 0.784 13 1.75 13H14.25C15.216 13 16 12.216 16 11.25V3.75C16 2.784 15.216 2 14.25 2H1.75ZM1 3.75C1 3.336 1.336 3 1.75 3H14.25C14.664 3 15 3.336 15 3.75V11.25C15 11.664 14.664 12 14.25 12H1.75C1.336 12 1 11.664 1 11.25V3.75ZM3 5.5C3 5.224 3.224 5 3.5 5H12.5C12.776 5 13 5.224 13 5.5C13 5.776 12.776 6 12.5 6H3.5C3.224 6 3 5.776 3 5.5ZM3 8.5C3 8.224 3.224 8 3.5 8H9.5C9.776 8 10 8.224 10 8.5C10 8.776 9.776 9 9.5 9H3.5C3.224 9 3 8.776 3 8.5Z" />
+        </svg>
+        <span>Remotes</span>
+        <span v-if="gitRefs.remotes.length > 0" class="tab-badge">{{ gitRefs.remotes.length }}</span>
       </button>
     </div>
 
@@ -408,7 +462,7 @@ const hasActiveFilter = computed(() => {
     </template>
 
     <!-- ============ Stash Tab ============ -->
-    <template v-else>
+    <template v-else-if="activeTab === 'stash'">
       <div class="toolbar">
         <div class="filter-row stash-filter-row">
           <div class="search-container">
@@ -507,6 +561,32 @@ const hasActiveFilter = computed(() => {
           </ul>
         </template>
       </div>
+    </template>
+
+    <!-- ============ Branches Tab ============ -->
+    <template v-else-if="activeTab === 'branches'">
+      <RefPanel
+        v-model:search="refsSearch"
+        mode="branches"
+        :branches="gitRefs.branches"
+        :remotes="gitRefs.remotes"
+        :loading="isRefsLoading"
+        @refresh="loadGitRefs"
+        @select-branch="showBranchHistory"
+      />
+    </template>
+
+    <!-- ============ Remotes Tab ============ -->
+    <template v-else>
+      <RefPanel
+        v-model:search="refsSearch"
+        mode="remotes"
+        :branches="gitRefs.branches"
+        :remotes="gitRefs.remotes"
+        :loading="isRefsLoading"
+        @refresh="loadGitRefs"
+        @select-branch="showBranchHistory"
+      />
     </template>
 
     <div v-if="error" class="error">

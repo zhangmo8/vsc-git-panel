@@ -2,7 +2,7 @@ import simpleGit from 'simple-git'
 import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
-import type { Commit, CommitFile, CommitGraph, ExtendedLogResult, GitHeadInfo, GitHistoryFilter, StashEntry } from './types'
+import type { Commit, CommitFile, CommitGraph, ExtendedLogResult, GitBranchRef, GitHeadInfo, GitHistoryFilter, GitRefsSummary, GitRemoteRef, StashEntry } from './types'
 import {
   buildHistoryLogArgs,
   buildOperations,
@@ -309,6 +309,115 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  function findRemoteName(branchName: string, remoteNames: string[]): string | undefined {
+    return remoteNames
+      .sort((a, b) => b.length - a.length)
+      .find(remoteName => branchName.startsWith(`${remoteName}/`))
+  }
+
+  async function getAheadBehind(branchName: string, upstream?: string): Promise<{ ahead: number, behind: number } | undefined> {
+    if (!upstream)
+      return undefined
+
+    try {
+      const raw = await git.raw(['rev-list', '--left-right', '--count', `${upstream}...${branchName}`])
+      const [behindRaw, aheadRaw] = raw.trim().split(/\s+/)
+      return {
+        ahead: Number.parseInt(aheadRaw || '0', 10),
+        behind: Number.parseInt(behindRaw || '0', 10),
+      }
+    }
+    catch (error) {
+      logger.warn(`Failed to get ahead/behind for ${branchName}:`, error)
+      return undefined
+    }
+  }
+
+  async function getGitRefs(): Promise<GitRefsSummary> {
+    try {
+      const FIELD = String.fromCharCode(0x1F)
+      const RECORD = String.fromCharCode(0x1E)
+      const format = `%(refname)%x1f%(refname:short)%x1f%(objectname:short)%x1f%(committerdate:iso-strict)%x1f%(contents:subject)%x1f%(upstream:short)%x1f%(HEAD)%x1e`
+
+      const [rawRefs, remotes] = await Promise.all([
+        git.raw(['for-each-ref', `--format=${format}`, 'refs/heads', 'refs/remotes']),
+        git.getRemotes(true),
+      ])
+
+      const remoteNames = remotes.map(remote => remote.name)
+      const records = rawRefs
+        .split(RECORD)
+        .map(record => record.replace(/^[\r\n]+|[\r\n]+$/g, ''))
+        .filter(Boolean)
+
+      const branches: GitBranchRef[] = []
+
+      for (const record of records) {
+        const [fullName, shortName, commit, date, subject, upstream, headMarker] = record.split(FIELD)
+
+        if (!fullName || !shortName)
+          continue
+
+        if (/^refs\/remotes\/[^/]+\/HEAD$/.test(fullName))
+          continue
+
+        const type = fullName.startsWith('refs/remotes/') ? 'remote' : 'local'
+        const remote = type === 'remote' ? findRemoteName(shortName, remoteNames) : undefined
+        const branch: GitBranchRef = {
+          name: shortName,
+          fullName,
+          type,
+          remote,
+          current: headMarker === '*',
+          upstream: upstream || undefined,
+          commit: commit || '',
+          subject: subject || '',
+          date: date || '',
+        }
+
+        branches.push(branch)
+      }
+
+      const branchesWithTracking = await Promise.all(
+        branches.map(async (branch) => {
+          if (branch.type !== 'local' || !branch.upstream)
+            return branch
+
+          const tracking = await getAheadBehind(branch.name, branch.upstream)
+          return tracking ? { ...branch, ...tracking } : branch
+        }),
+      )
+
+      const remoteRefs: GitRemoteRef[] = remotes.map((remote) => {
+        const remoteBranches = branchesWithTracking
+          .filter(branch => branch.type === 'remote' && branch.remote === remote.name)
+          .sort((a, b) => a.name.localeCompare(b.name))
+
+        return {
+          name: remote.name,
+          fetchUrl: remote.refs.fetch,
+          pushUrl: remote.refs.push,
+          branches: remoteBranches,
+        }
+      })
+
+      return {
+        branches: branchesWithTracking.sort((a, b) => {
+          if (a.current !== b.current)
+            return a.current ? -1 : 1
+          if (a.type !== b.type)
+            return a.type === 'local' ? -1 : 1
+          return a.name.localeCompare(b.name)
+        }),
+        remotes: remoteRefs.sort((a, b) => a.name.localeCompare(b.name)),
+      }
+    }
+    catch (error) {
+      logger.error('Failed to get git refs:', error)
+      return { branches: [], remotes: [] }
+    }
+  }
+
   /**
    * 获取 stash 列表
    * 使用 `git stash list` 配合自定义格式以便稳定解析
@@ -513,6 +622,7 @@ export const useGitService = createSingletonComposable(() => {
     getHeadInfo,
     getLineHistory,
     getLineHistoryForHover,
+    getGitRefs,
     clearCache,
     getStashList,
     applyStash,

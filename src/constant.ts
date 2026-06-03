@@ -6,6 +6,7 @@ export const WEBVIEW_CHANNEL = {
   SHOW_COMMIT_DETAILS: 'show-commit-details',
   SHOW_CHANGES_PANEL: 'show-changes-panel',
   GET_STASH_LIST: 'get-stash-list',
+  GET_GIT_REFS: 'get-git-refs',
   APPLY_STASH: 'apply-stash',
   POP_STASH: 'pop-stash',
   DROP_STASH: 'drop-stash',
@@ -24,6 +25,7 @@ export const CHANNEL = {
   ERROR: 'error',
   STASH_LIST: 'stash-list',
   STASH_ACTION_RESULT: 'stash-action-result',
+  GIT_REFS: 'git-refs',
 } as const
 
 export const EXTENSION_SYMBOL = 'git-panel'
