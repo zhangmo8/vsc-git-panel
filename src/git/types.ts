@@ -12,7 +12,7 @@ export interface CommitDiffStats {
   deletions: number
 }
 
-export type Commit = CommitFields & ListLogLine
+export type Commit = CommitFields & Omit<ListLogLine, 'diff'>
 
 export interface CommitFields extends DefaultLogFields {
   authorName: string

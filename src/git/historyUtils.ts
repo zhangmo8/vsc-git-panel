@@ -166,7 +166,7 @@ export function isBadRevisionError(error: unknown): boolean {
   return msg.includes('bad revision') || msg.includes('unknown revision') || msg.includes('fatal:')
 }
 
-export function extractBranches(commits: Commit[]): string[] {
+export function extractBranches(commits: readonly Commit[]): string[] {
   const branchSet = new Set<string>()
 
   for (const commit of commits) {
@@ -180,7 +180,7 @@ export function extractBranches(commits: Commit[]): string[] {
   return Array.from(branchSet)
 }
 
-export function buildOperations(commits: Commit[]): GitOperation[] {
+export function buildOperations(commits: readonly Commit[]): GitOperation[] {
   return commits.map((commit) => {
     const branchRefs = getBranchRefs(commit.refs)
     const mainBranch = branchRefs[0] || 'main'
