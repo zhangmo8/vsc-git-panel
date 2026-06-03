@@ -10,7 +10,7 @@ const props = defineProps<{
 }>()
 
 const emit = defineEmits<{
-  (e: 'action', action: GitBranchAction): void
+  (e: 'action', action: GitBranchAction, branch: GitBranchRef): void
   (e: 'close'): void
 }>()
 
@@ -71,7 +71,7 @@ function runAction(item: MenuAction) {
   if (item.disabled)
     return
 
-  emit('action', item.action)
+  emit('action', item.action, props.branch)
 }
 </script>
 
@@ -82,6 +82,7 @@ function runAction(item: MenuAction) {
     role="menu"
     :style="menuStyle"
     :aria-label="`Branch actions for ${branch.name}`"
+    @pointerdown.stop
     @click.stop
     @contextmenu.prevent
   >
@@ -101,6 +102,7 @@ function runAction(item: MenuAction) {
       role="menuitem"
       :disabled="item.disabled"
       :title="item.reason || item.label"
+      @pointerdown.stop
       @click="runAction(item)"
     >
       <span>{{ item.label }}</span>
