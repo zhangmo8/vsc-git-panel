@@ -87,8 +87,26 @@ function fetchRemote(remoteName: string) {
   vscode.postMessage({ command: WEBVIEW_CHANNEL.FETCH_REMOTE, remote: remoteName })
 }
 
+function toPlainBranchRef(branch: GitBranchRef): GitBranchRef {
+  const rawBranch = toRaw(branch)
+  return {
+    name: rawBranch.name,
+    fullName: rawBranch.fullName,
+    type: rawBranch.type,
+    current: rawBranch.current,
+    remote: rawBranch.remote,
+    upstream: rawBranch.upstream,
+    ahead: rawBranch.ahead,
+    behind: rawBranch.behind,
+    commit: rawBranch.commit,
+    subject: rawBranch.subject,
+    date: rawBranch.date,
+  }
+}
+
 function runBranchAction(action: GitBranchAction, branch: GitBranchRef) {
-  vscode.postMessage({ command: WEBVIEW_CHANNEL.RUN_BRANCH_ACTION, action, branch })
+  const plainBranch = toPlainBranchRef(branch)
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.RUN_BRANCH_ACTION, action, branch: plainBranch })
 }
 
 function clearStashSearch() {
