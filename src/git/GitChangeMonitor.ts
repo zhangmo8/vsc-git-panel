@@ -1,6 +1,7 @@
 import { type Disposable, extensions } from 'vscode'
 import { createSingletonComposable, ref, useFsWatcher } from 'reactive-vscode'
 import { useGitPanelView } from '@/views/webview'
+import { useFileHistoryTreeView } from '@/views/fileHistory'
 import { config } from '@/config'
 import { useGitService } from '@/git'
 import { formatError, logger } from '@/utils'
@@ -19,6 +20,7 @@ interface GitAPI {
 
 export const useGitChangeMonitor = createSingletonComposable(() => {
   const webview = useGitPanelView()
+  const fileHistory = useFileHistoryTreeView()
   const git = useGitService()
 
   const disposables = ref<Disposable[]>([])
@@ -48,6 +50,7 @@ export const useGitChangeMonitor = createSingletonComposable(() => {
       git.clearCache()
       webview.refreshHistory(true)
       webview.refreshStashList()
+      fileHistory.refresh(true)
     }, debounceTime)
   }
 

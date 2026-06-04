@@ -3,6 +3,7 @@ import { defineExtension, useDisposable } from 'reactive-vscode'
 
 import { useGitPanelView } from './views/webview'
 import { useDiffTreeView } from './views/diff/DiffTreeView'
+import { useFileHistoryTreeView } from './views/fileHistory'
 import { logger } from './utils'
 import { initCommands } from './commands'
 import { initDecoration } from './decoration'
@@ -14,6 +15,7 @@ const { activate, deactivate } = defineExtension(() => {
 
   useGitPanelView()
   const { tree } = useDiffTreeView()
+  const { tree: fileHistoryTree } = useFileHistoryTreeView()
 
   const gitChangeMonitor = useGitChangeMonitor()
 
@@ -23,6 +25,7 @@ const { activate, deactivate } = defineExtension(() => {
 
   useDisposable(new Disposable(() => {
     tree.dispose()
+    fileHistoryTree.dispose()
     gitChangeMonitor.dispose()
   }))
 })
