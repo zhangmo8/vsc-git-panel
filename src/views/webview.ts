@@ -12,7 +12,7 @@ import {
 import { useDiffTreeView } from './diff/DiffTreeView'
 
 import { useGitService } from '@/git'
-import { CHANNEL, EXTENSION_SYMBOL, WEBVIEW_CHANNEL } from '@/constant'
+import { CHANGES_VIEW_ID, CHANNEL, HISTORY_VIEW_ID, WEBVIEW_CHANNEL } from '@/constant'
 import { formatError, logger } from '@/utils'
 
 import type { CommitGraph, GitBranchAction, GitBranchRef, GitHeadInfo, GitHistoryFilter } from '@/git'
@@ -141,7 +141,7 @@ export const useGitPanelView = createSingletonComposable(() => {
   }
 
   const { forceRefresh, view, postMessage } = useWebviewView(
-    `${EXTENSION_SYMBOL}.history`,
+    HISTORY_VIEW_ID,
     computed(() => getHtml(view.value?.webview)),
     {
       retainContextWhenHidden: true,
@@ -188,7 +188,7 @@ export const useGitPanelView = createSingletonComposable(() => {
             break
 
           case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
-            await executeCommand('git-panel.changes.focus')
+            await executeCommand(`${CHANGES_VIEW_ID}.focus`)
             break
 
           case WEBVIEW_CHANNEL.GET_STASH_LIST:
@@ -237,7 +237,7 @@ export const useGitPanelView = createSingletonComposable(() => {
                 authorName: message.authorName,
                 authorEmail: message.authorEmail,
               })
-              await executeCommand('git-panel.changes.focus')
+              await executeCommand(`${CHANGES_VIEW_ID}.focus`)
             }
             catch (error) {
               const errorMessage = formatError(error)
@@ -594,7 +594,7 @@ export const useGitPanelView = createSingletonComposable(() => {
   }
 
   return {
-    viewType: `${EXTENSION_SYMBOL}.history` as const,
+    viewType: HISTORY_VIEW_ID,
     refreshHistory,
     postMessage,
     forceRefresh,
