@@ -20,6 +20,7 @@ export * from './types'
 export * from './utils'
 export * from './historyUtils'
 export * from './lineHistoryUtils'
+export * from './pathUtils'
 
 // Cache interface
 interface CacheEntry<T> {
@@ -352,13 +353,32 @@ export const useGitService = createSingletonComposable(() => {
 
     const verboseRemotes = await git.raw(['remote', '-v']).catch(() => '')
     for (const line of verboseRemotes.split('\n')) {
-      const match = line.trim().match(/^(\S+)\s+(.+)\s+\((fetch|push)\)$/)
-      if (!match)
+      const trimmedLine = line.trim()
+      const direction = trimmedLine.endsWith(' (fetch)')
+        ? 'fetch'
+        : trimmedLine.endsWith(' (push)')
+          ? 'push'
+          : undefined
+      if (!direction)
         continue
 
-      const [, name, url, direction] = match
+      const remoteInfo = trimmedLine.slice(0, -` (${direction})`.length).trimEnd()
+      let separatorIndex = -1
+      for (let index = 0; index < remoteInfo.length; index++) {
+        const char = remoteInfo[index]
+        if (char === ' ' || char === '\t') {
+          separatorIndex = index
+          break
+        }
+      }
+
+      if (separatorIndex <= 0)
+        continue
+
+      const name = remoteInfo.slice(0, separatorIndex)
+      const url = remoteInfo.slice(separatorIndex).trimStart()
       const configuredRemote = ensureRemote(name)
-      configuredRemote.refs[direction as 'fetch' | 'push'] = url
+      configuredRemote.refs[direction] = url
     }
 
     return [...remoteMap.values()].sort((a, b) => a.name.localeCompare(b.name))

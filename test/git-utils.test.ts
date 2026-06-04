@@ -24,7 +24,7 @@ describe('git history helpers', () => {
   it('creates stable cache keys without mutating branch filters', () => {
     const filter = { branches: ['z', 'a'], author: 'alice', page: 2, pageSize: 20 }
 
-    expect(createCacheKey(filter)).toBe('a,z|alice|||2|20')
+    expect(createCacheKey(filter)).toBe('a,z|alice|||||2|20')
     expect(filter.branches).toEqual(['z', 'a'])
   })
 
@@ -35,6 +35,35 @@ describe('git history helpers', () => {
       '--decorate=full',
       '--pretty=format:%H%x01%P%x01%an%x01%ae%x01%ad%x01%s%x01%d%x01%b',
       '--stat',
+    ])
+  })
+
+  it('builds file history args with rename following when requested', () => {
+    expect(buildHistoryLogArgs({ filePath: 'src/index.ts', followRenames: true, pageSize: 10 })).toEqual([
+      '--all',
+      '--follow',
+      '--max-count=10',
+      '--decorate=full',
+      '--pretty=format:%H%x01%P%x01%an%x01%ae%x01%ad%x01%s%x01%d%x01%b',
+      '--stat',
+      '--',
+      'src/index.ts',
+    ])
+  })
+
+  it('builds line history args without pathspec', () => {
+    expect(buildHistoryLogArgs({
+      filePath: 'src/index.ts',
+      lineRange: { start: 12, end: 10 },
+      page: 2,
+      pageSize: 5,
+    })).toEqual([
+      '--skip=5',
+      '--max-count=5',
+      '--decorate=full',
+      '--pretty=format:%H%x01%P%x01%an%x01%ae%x01%ad%x01%s%x01%d%x01%b',
+      '-L',
+      '10,12:src/index.ts',
     ])
   })
 

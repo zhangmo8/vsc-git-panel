@@ -11,6 +11,8 @@ export function createCacheKey(filter?: GitHistoryFilter): string {
     filter.author || 'any',
     filter.search || '',
     filter.filePath || '',
+    filter.followRenames ? 'follow' : '',
+    filter.lineRange ? `${filter.lineRange.start}-${filter.lineRange.end}` : '',
     filter.page || 1,
     filter.pageSize || 45,
   ]
@@ -28,6 +30,29 @@ export function buildHistoryLogArgs(filter?: GitHistoryFilter): string[] {
   const page = filter?.page || 1
   const skip = (page - 1) * pageSize
   const prettyFormat = '--pretty=format:%H%x01%P%x01%an%x01%ae%x01%ad%x01%s%x01%d%x01%b'
+  const lineRange = filter?.lineRange
+
+  if (filter?.filePath && lineRange) {
+    const lineStart = Math.max(1, Math.min(lineRange.start, lineRange.end))
+    const lineEnd = Math.max(lineStart, Math.max(lineRange.start, lineRange.end))
+    const logArgs: string[] = []
+
+    if (filter.branches && filter.branches.length === 1)
+      logArgs.push(filter.branches[0])
+
+    if (skip > 0)
+      logArgs.push(`--skip=${skip}`)
+
+    logArgs.push(
+      `--max-count=${pageSize}`,
+      '--decorate=full',
+      prettyFormat,
+      '-L',
+      `${lineStart},${lineEnd}:${filter.filePath}`,
+    )
+
+    return logArgs
+  }
 
   const logArgs: string[] = []
 
@@ -40,6 +65,10 @@ export function buildHistoryLogArgs(filter?: GitHistoryFilter): string[] {
 
   if (filter?.author) {
     logArgs.push(`--author=${filter.author}`)
+  }
+
+  if (filter?.filePath && filter.followRenames) {
+    logArgs.push('--follow')
   }
 
   if (skip > 0) {

@@ -1,5 +1,4 @@
 import { createHash } from 'node:crypto'
-import path from 'node:path'
 import {
   DecorationRangeBehavior,
   Hover,
@@ -10,10 +9,11 @@ import {
   window,
   workspace,
 } from 'vscode'
-import type { Disposable, TextDocument, TextEditor, Uri } from 'vscode'
+import type { Disposable, TextDocument, TextEditor } from 'vscode'
 import { extensionContext as context } from 'reactive-vscode'
 
 import { useGitService } from '@/git'
+import { getRelativePath } from '@/git/pathUtils'
 import type { GitLineHistory } from '@/git'
 import { EXTENSION_SYMBOL } from '@/constant'
 import { logger } from '@/utils'
@@ -209,21 +209,6 @@ function createHoverMessage(
 
   appendHoverScrollEnd(markdown)
   return markdown
-}
-
-function isInsideRepo(rootRepoPath: string, filePath: string): boolean {
-  const relativePath = path.relative(rootRepoPath, filePath)
-  return !!relativePath && !relativePath.startsWith('..') && !path.isAbsolute(relativePath)
-}
-
-function getRelativePath(rootRepoPath: string, uri: Uri): string | null {
-  if (uri.scheme !== 'file')
-    return null
-
-  if (!isInsideRepo(rootRepoPath, uri.fsPath))
-    return null
-
-  return path.relative(rootRepoPath, uri.fsPath).split(path.sep).join('/')
 }
 
 function shouldAnnotateDocument(document: TextDocument): boolean {

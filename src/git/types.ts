@@ -61,6 +61,11 @@ export interface GitHistoryFilter {
   page?: number
   pageSize?: number
   filePath?: string // Search commits that modified a specific file
+  followRenames?: boolean
+  lineRange?: {
+    start: number
+    end: number
+  }
 }
 
 export interface GitHeadInfo {
