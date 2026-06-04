@@ -33,7 +33,9 @@
     "vscode": "^1.105.0"
   },
   "activationEvents": [
-    "onStartupFinished"
+    "onStartupFinished",
+    "onView:git-panel.historyView",
+    "onView:git-panel.changes"
   ],
   "contributes": {
     "viewsContainers": {
@@ -43,29 +45,24 @@
           "title": "Git Panel",
           "icon": "$(git-commit)"
         }
-      ],
-      "panel": [
-        {
-          "id": "git-panel",
-          "title": "GitPanel",
-          "icon": "res/icon.png"
-        }
       ]
     },
     "views": {
       "git-panel": [
         {
           "type": "webview",
-          "id": "git-panel.history",
+          "id": "git-panel.historyView",
           "name": "Git Panel",
           "icon": "$(repo-forked)",
-          "contextualTitle": "History"
+          "contextualTitle": "History",
+          "visibility": "visible"
         },
         {
           "id": "git-panel.changes",
           "name": "Git Changes",
           "icon": "$(history)",
-          "contextualTitle": "Changes"
+          "contextualTitle": "Changes",
+          "visibility": "visible"
         }
       ]
     },
@@ -117,27 +114,27 @@
       "view/title": [
         {
           "command": "git-panel.history.refresh",
-          "when": "view =~ /git-panel.history/",
+          "when": "view == git-panel.historyView",
           "group": "navigation@4"
         },
         {
           "command": "git-panel.history.clear",
-          "when": "view =~ /git-panel.history/",
+          "when": "view == git-panel.historyView",
           "group": "navigation@4"
         },
         {
           "command": "git-panel.showStats",
-          "when": "view =~ /git-panel.history/",
+          "when": "view == git-panel.historyView",
           "group": "navigation@5"
         },
         {
           "command": "git-panel.goToCommit",
-          "when": "view =~ /git-panel.history/",
+          "when": "view == git-panel.historyView",
           "group": "navigation@6"
         },
         {
           "command": "git-panel.backToHead",
-          "when": "view =~ /git-panel.history/",
+          "when": "view == git-panel.historyView",
           "group": "navigation@7"
         }
       ],

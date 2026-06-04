@@ -1,4 +1,4 @@
-import { useCommands } from 'reactive-vscode'
+import { executeCommand, useCommands } from 'reactive-vscode'
 
 import refreshCommand from './refresh'
 import diffCommand from './diff'
@@ -8,7 +8,8 @@ import showStatsCommand from './showStats'
 import goToCommitCommand from './goToCommit'
 import backToHeadCommand from './backToHead'
 
-import { EXTENSION_SYMBOL } from '@/constant'
+import { EXTENSION_SYMBOL, HISTORY_VIEW_ID } from '@/constant'
+import { logger } from '@/utils'
 
 let _commandsInitialized = false
 
@@ -19,6 +20,10 @@ export function initCommands() {
   _commandsInitialized = true
 
   useCommands({
+    [`${EXTENSION_SYMBOL}.history`]: async () => {
+      logger.info(`[command] focus ${HISTORY_VIEW_ID}`)
+      await executeCommand(`${HISTORY_VIEW_ID}.focus`)
+    },
     [`${EXTENSION_SYMBOL}.history.refresh`]: refreshCommand,
     [`${EXTENSION_SYMBOL}.openDiff`]: diffCommand(),
     [`${EXTENSION_SYMBOL}.history.clear`]: clearCommand,
