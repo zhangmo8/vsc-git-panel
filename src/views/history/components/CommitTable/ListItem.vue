@@ -2,6 +2,9 @@
 import { computed, ref } from 'vue'
 import CopyButton from '../CopyButton/index.vue'
 import GitGraph from './GitGraph.vue'
+import { getCommitColumnStyle, isCommitColumnVisible } from './columns'
+
+import type { ColumnVisibility, ColumnWidths, CommitTableColumn } from './columns'
 
 import { WEBVIEW_CHANNEL } from '@/constant'
 
@@ -9,7 +12,9 @@ import type { Commit } from '@/git'
 
 const props = defineProps<{
   commit: Commit
-  columnWidths: Record<string, number>
+  columnWidths: ColumnWidths
+  columnVisibility: ColumnVisibility
+  flexibleColumn: CommitTableColumn
   isSelected?: boolean
   graph?: {
     node: { x: number, color: string }
@@ -32,40 +37,12 @@ const ghostBranchName = computed(() => {
   return props.ghostBranch?.trim() || props.commit.branchName?.trim() || ''
 })
 
-type ColumnKey = 'branchName' | 'branch' | 'hash' | 'message' | 'stats' | 'author' | 'date'
-
-const FLEXIBLE_COLUMN: ColumnKey = 'branchName'
-const MIN_WIDTHS: Record<ColumnKey, number> = {
-  branchName: 80,
-  branch: 60,
-  hash: 60,
-  message: 110,
-  stats: 90,
-  author: 70,
-  date: 90,
+function getColumnStyle(column: CommitTableColumn) {
+  return getCommitColumnStyle(column, props.columnWidths, props.flexibleColumn)
 }
 
-function getColumnStyle(column: ColumnKey) {
-  const width = props.columnWidths?.[column] ?? MIN_WIDTHS[column]
-  const minWidth = MIN_WIDTHS[column]
-  if (column === FLEXIBLE_COLUMN) {
-    return {
-      flex: `1 1 ${width}px`,
-      minWidth: `${minWidth}px`,
-    }
-  }
-  if (column === 'branch') {
-    return {
-      flex: `0 0 ${width}px`,
-      minWidth: `${minWidth}px`,
-      width: `${width}px`,
-    }
-  }
-
-  return {
-    flex: `0 1 ${width}px`,
-    minWidth: `${minWidth}px`,
-  }
+function shouldShowColumn(column: CommitTableColumn) {
+  return isCommitColumnVisible(props.columnVisibility, column)
 }
 
 function getBranchColorFromGraphData(branchName: string): string {
@@ -238,7 +215,7 @@ function handleDoubleClick() {
     @click="handleCommitClick"
     @dblclick="handleDoubleClick"
   >
-    <div class="branch-name-col commit-cell" :style="getColumnStyle('branchName')">
+    <div v-if="shouldShowColumn('branchName')" class="branch-name-col commit-cell" :style="getColumnStyle('branchName')">
       <template v-if="parsedRefs.length > 0">
         <div class="refs-container">
           <!-- First item -->
@@ -308,7 +285,7 @@ function handleDoubleClick() {
         </div>
       </template>
     </div>
-    <div class="branch-col commit-cell" :style="getColumnStyle('branch')">
+    <div v-if="shouldShowColumn('branch')" class="branch-col commit-cell" :style="getColumnStyle('branch')">
       <div class="branch-graph-mask">
         <GitGraph
           :graph="graph"
@@ -318,6 +295,7 @@ function handleDoubleClick() {
       </div>
     </div>
     <span
+      v-if="shouldShowColumn('hash')"
       class="hash-col commit-cell" :style="getColumnStyle('hash')" @mouseenter="hoveredCell = 'hash'"
       @mouseleave="hoveredCell = null"
     >
@@ -326,6 +304,7 @@ function handleDoubleClick() {
     </span>
 
     <span
+      v-if="shouldShowColumn('message')"
       class="commit-cell" :style="getColumnStyle('message')" @mouseenter="hoveredCell = 'message'"
       @mouseleave="hoveredCell = null"
     >
@@ -333,7 +312,7 @@ function handleDoubleClick() {
       <CopyButton v-show="hoveredCell === 'message'" :copy-text="commit.message" />
     </span>
 
-    <span class="commit-cell" :style="getColumnStyle('stats')">
+    <span v-if="shouldShowColumn('stats')" class="commit-cell" :style="getColumnStyle('stats')">
       <span v-if="commit.diff" class="commit-stats">
         <span class="files">{{ commit.diff.changed }} files</span>
         <span v-if="commit.diff.insertions" class="additions">+{{ commit.diff.insertions }}</span>
@@ -342,6 +321,7 @@ function handleDoubleClick() {
     </span>
 
     <span
+      v-if="shouldShowColumn('author')"
       class="commit-cell" :style="getColumnStyle('author')" @mouseenter="hoveredCell = 'authorName'"
       @mouseleave="hoveredCell = null"
     >
@@ -349,7 +329,7 @@ function handleDoubleClick() {
       <CopyButton v-show="hoveredCell === 'authorName'" :copy-text="`${commit.authorName} <${commit.authorEmail}>`" />
     </span>
 
-    <span class="commit-cell date" :style="getColumnStyle('date')">{{ commit.date }}</span>
+    <span v-if="shouldShowColumn('date')" class="commit-cell date" :style="getColumnStyle('date')">{{ commit.date }}</span>
   </li>
 </template>
 

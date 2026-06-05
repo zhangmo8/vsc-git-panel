@@ -6,9 +6,17 @@ import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 
 import ColumnHeader from './ColumnHeader.vue'
 import ListItem from './ListItem.vue'
+import {
+  DEFAULT_COLUMN_VISIBILITY,
+  DEFAULT_COLUMN_WIDTHS,
+  getFlexibleColumn,
+  normalizeColumnVisibility,
+} from './columns'
 
-import type { Commit, GitOperation } from '@/git'
+import type { ColumnVisibility, ColumnWidths } from './columns'
+
 import { WEBVIEW_CHANNEL } from '@/constant'
+import type { Commit, GitOperation } from '@/git'
 
 const props = defineProps<{
   commits: Commit[]
@@ -21,6 +29,9 @@ const props = defineProps<{
 
 // Selected commit hash state
 const selectedCommitHashes = defineModel<string[]>({ default: [] })
+const columnVisibility = defineModel<ColumnVisibility>('columnVisibility', {
+  default: () => ({ ...DEFAULT_COLUMN_VISIBILITY }),
+})
 const scrollerRef = ref<{ scrollToItem?: (index: number) => void } | null>(null)
 const lastScrolledHash = ref('')
 
@@ -28,15 +39,9 @@ const isDragging = ref(false)
 const selectionStart = ref<number | null>(null)
 const dragEndIndex = ref<number>(0)
 
-const columnWidths = ref({
-  branch: 120,
-  branchName: 140, // 新增: 分支名和标签列
-  hash: 80,
-  message: 200,
-  stats: 140,
-  author: 120,
-  date: 160,
-})
+const columnWidths = ref<ColumnWidths>({ ...DEFAULT_COLUMN_WIDTHS })
+const activeColumnVisibility = computed(() => normalizeColumnVisibility(columnVisibility.value))
+const flexibleColumn = computed(() => getFlexibleColumn(activeColumnVisibility.value))
 
 const branchLookup = computed<Record<string, string>>(() => {
   const lookup: Record<string, string> = {}
@@ -447,7 +452,7 @@ watch(
 <template>
   <div :class="{ dragging: isDragging }" class="git-graph" @mouseleave="handleMouseUp" @mouseup="handleMouseUp">
     <div class="commit-list-container">
-      <ColumnHeader v-model="columnWidths" class="column-header" />
+      <ColumnHeader v-model="columnWidths" v-model:visibility="columnVisibility" class="commit-table-header" />
       <RecycleScroller
         ref="scrollerRef"
         v-slot="{ item: row, index }"
@@ -471,6 +476,8 @@ watch(
           :graph="row.graph"
           :ghost-branch="row.branchHint"
           :column-widths="columnWidths"
+          :column-visibility="activeColumnVisibility"
+          :flexible-column="flexibleColumn"
           :is-selected="selectedCommitHashes.includes(row.commit.hash)"
           :class="{
             'being-dragged': isDragging && selectionStart !== null
@@ -509,7 +516,7 @@ watch(
   overflow: hidden;
 }
 
-.column-header {
+.commit-table-header {
   flex-shrink: 0;
   position: sticky;
   top: 0;
