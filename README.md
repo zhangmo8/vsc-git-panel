@@ -1,4 +1,4 @@
-# VSC Git Panel 👀 WIP
+# VSC Git Panel
 
   Inspect by [Git History](https://marketplace.visualstudio.com/items?itemName=GuodongSun.vscode-git-cruise).
 
