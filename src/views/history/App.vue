@@ -219,10 +219,13 @@ function handleSearchKeyup(event: KeyboardEvent) {
 
 // 清除筛选
 function clearFilter() {
+  const wasFileHistoryMode = isFileHistoryMode.value
   searchText.value = ''
   selectedBranch.value = ''
   selectedAuthor.value = ''
   isFileHistoryMode.value = false
+  if (wasFileHistoryMode)
+    vscode.postMessage({ command: WEBVIEW_CHANNEL.EXIT_FILE_HISTORY })
   currentPage.value = 1 // 重置页面
   allCommits.value = [] // 清空累积数据
   hasMoreData.value = true // 重置数据状态
@@ -257,13 +260,6 @@ function enterFileHistory() {
   isFileHistoryMode.value = true
   selectedCommitHashes.value = []
   loadFileHistory(false, true)
-}
-
-function exitFileHistory() {
-  isFileHistoryMode.value = false
-  selectedCommitHashes.value = []
-  fileHistoryError.value = ''
-  vscode.postMessage({ command: WEBVIEW_CHANNEL.EXIT_FILE_HISTORY })
 }
 
 function loadMoreFileHistory() {
@@ -435,20 +431,43 @@ const fileHistoryGraphData = computed(() => {
   } as GitOperation))
 })
 
-const fileHistoryStatusText = computed(() => {
+const fileHistoryScopeTitle = computed(() => {
+  if (fileHistoryViewMode.value === 'line')
+    return 'Line History'
+
+  return fileHistoryTarget.value?.isDirectory ? 'Folder History' : 'File History'
+})
+
+const fileHistoryScopeLabel = computed(() => {
   if (!fileHistoryTarget.value)
     return fileHistoryViewMode.value === 'line' ? 'Open a file and select a line' : 'Open a file to view history'
 
-  const targetType = fileHistoryViewMode.value === 'line'
-    ? 'Line'
-    : fileHistoryTarget.value.isDirectory ? 'Folder' : 'File'
-  const followState = fileHistoryFollowing.value ? 'following active editor' : 'pinned'
-  return `${targetType}: ${fileHistoryTarget.value.relativePath} · ${followState}`
+  const lineRange = fileHistoryTarget.value.lineRange
+  if (fileHistoryViewMode.value === 'line' && lineRange) {
+    const suffix = lineRange.start === lineRange.end
+      ? `:${lineRange.start}`
+      : `:${lineRange.start}-${lineRange.end}`
+    return `${fileHistoryTarget.value.relativePath}${suffix}`
+  }
+
+  return fileHistoryTarget.value.relativePath
+})
+
+const fileHistoryScopeMeta = computed(() => {
+  const parts = [
+    fileHistoryFollowing.value ? 'Following active editor' : 'Pinned',
+    `${transformedFileHistoryCommits.value.length} commit${transformedFileHistoryCommits.value.length === 1 ? '' : 's'}`,
+  ]
+
+  if (fileHistoryLineBlame.value?.isUncommitted)
+    parts.unshift('Not committed yet')
+
+  return parts.join(' · ')
 })
 
 // 计算筛选状态
-const hasActiveFilter = computed(() => {
-  return searchText.value.trim() || selectedBranch.value || selectedAuthor.value || isFileHistoryMode.value
+const hasSearchFilter = computed(() => {
+  return searchText.value.trim() || selectedBranch.value || selectedAuthor.value
 })
 </script>
 
@@ -504,6 +523,43 @@ const hasActiveFilter = computed(() => {
     <!-- ============ History Tab ============ -->
     <template v-if="activeTab === 'history'">
       <div class="toolbar">
+        <div v-if="isFileHistoryMode" class="history-scope-row">
+          <span class="history-scope-pill" :class="`mode-${fileHistoryViewMode}`">
+            <svg
+              v-if="fileHistoryViewMode === 'line'"
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M2.5 3C2.22386 3 2 3.22386 2 3.5C2 3.77614 2.22386 4 2.5 4H13.5C13.7761 4 14 3.77614 14 3.5C14 3.22386 13.7761 3 13.5 3H2.5ZM2.5 6C2.22386 6 2 6.22386 2 6.5C2 6.77614 2.22386 7 2.5 7H13.5C13.7761 7 14 6.77614 14 6.5C14 6.22386 13.7761 6 13.5 6H2.5ZM2 9.5C2 9.22386 2.22386 9 2.5 9H13.5C13.7761 9 14 9.22386 14 9.5C14 9.77614 13.7761 10 13.5 10H2.5C2.22386 10 2 9.77614 2 9.5ZM2.5 12C2.22386 12 2 12.2239 2 12.5C2 12.7761 2.22386 13 2.5 13H9.5C9.77614 13 10 12.7761 10 12.5C10 12.2239 9.77614 12 9.5 12H2.5Z" />
+            </svg>
+            <svg
+              v-else
+              width="12"
+              height="12"
+              viewBox="0 0 16 16"
+              fill="currentColor"
+              aria-hidden="true"
+            >
+              <path d="M3.75 1C2.784 1 2 1.784 2 2.75V13.25C2 14.216 2.784 15 3.75 15H12.25C13.216 15 14 14.216 14 13.25V5.5L9.5 1H3.75ZM3 2.75C3 2.336 3.336 2 3.75 2H9V5.25C9 6.216 9.784 7 10.75 7H13V13.25C13 13.664 12.664 14 12.25 14H3.75C3.336 14 3 13.664 3 13.25V2.75ZM10 2.707L12.293 5H10.75C10.336 5 10 4.664 10 4.25V2.707Z" />
+            </svg>
+            {{ fileHistoryScopeTitle }}
+          </span>
+          <span class="history-scope-path" :title="fileHistoryScopeLabel">
+            {{ fileHistoryScopeLabel }}
+          </span>
+          <span class="history-scope-meta">{{ fileHistoryScopeMeta }}</span>
+          <button
+            class="history-scope-clear"
+            :disabled="isFileHistoryLoading"
+            title="Back to repository history"
+            @click="clearFilter"
+          >
+            Clear
+          </button>
+        </div>
         <!-- 搜索框和分支筛选 -->
         <div class="filter-row">
           <div class="search-container">
@@ -512,12 +568,12 @@ const hasActiveFilter = computed(() => {
               type="text"
               placeholder="Search commit message or SHA..."
               class="search-input"
-              :disabled="isLoading"
+              :disabled="isLoading || isFileHistoryMode"
               @keyup="handleSearchKeyup"
             >
             <button
               class="search-button"
-              :disabled="isLoading"
+              :disabled="isLoading || isFileHistoryMode"
               title="Search"
               @click="handleSearchClick"
             >
@@ -540,7 +596,7 @@ const hasActiveFilter = computed(() => {
             empty-text="No matching branch"
             all-label="All branches"
             width="180px"
-            :disabled="isLoading"
+            :disabled="isLoading || isFileHistoryMode"
           />
           <FilterSelect
             v-model="selectedAuthor"
@@ -550,14 +606,14 @@ const hasActiveFilter = computed(() => {
             all-label="All authors"
             width="220px"
             placement="right"
-            :disabled="isLoading"
+            :disabled="isLoading || isFileHistoryMode"
           />
           <button
+            v-if="!isFileHistoryMode"
             class="file-history-button"
-            :class="{ active: isFileHistoryMode }"
             :disabled="isLoading"
             title="Show current file history"
-            @click="isFileHistoryMode ? exitFileHistory() : enterFileHistory()"
+            @click="enterFileHistory"
           >
             <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
               <path d="M3 1.5C3 .672 3.672 0 4.5 0h4.086c.398 0 .78.158 1.061.44l2.914 2.913c.281.282.439.663.439 1.061V14.5c0 .828-.672 1.5-1.5 1.5h-7A1.5 1.5 0 0 1 3 14.5v-13ZM4.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H9.5A1.5 1.5 0 0 1 8 3.5V1H4.5Zm4.5.207V3.5a.5.5 0 0 0 .5.5h2.293L9 1.207ZM5.5 7a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Zm0 2a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Z" />
@@ -565,10 +621,10 @@ const hasActiveFilter = computed(() => {
             <span>File History</span>
           </button>
           <button
-            v-if="hasActiveFilter"
+            v-if="hasSearchFilter"
             class="clear-button"
             title="Clear filter"
-            :disabled="isLoading || isFileHistoryLoading"
+            :disabled="isLoading"
             @click="clearFilter"
           >
             ✕
@@ -577,23 +633,6 @@ const hasActiveFilter = computed(() => {
       </div>
 
       <template v-if="isFileHistoryMode">
-        <div class="file-history-status">
-          <span class="status-pill">
-            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-              <path d="M3 1.5C3 .672 3.672 0 4.5 0h4.086c.398 0 .78.158 1.061.44l2.914 2.913c.281.282.439.663.439 1.061V14.5c0 .828-.672 1.5-1.5 1.5h-7A1.5 1.5 0 0 1 3 14.5v-13ZM4.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H9.5A1.5 1.5 0 0 1 8 3.5V1H4.5Z" />
-            </svg>
-            {{ fileHistoryTitle }}
-          </span>
-          <span class="status-hint">{{ fileHistoryStatusText }}</span>
-          <button
-            class="file-history-exit-button"
-            title="Back to full history"
-            @click="exitFileHistory"
-          >
-            Back
-          </button>
-          <span v-if="fileHistoryLineBlame?.isUncommitted" class="status-hint">Not committed yet</span>
-        </div>
         <template v-if="!isFileHistoryLoading && transformedFileHistoryCommits.length === 0">
           <Empty class="git-graph-container" />
         </template>
@@ -867,11 +906,6 @@ const hasActiveFilter = computed(() => {
   white-space: nowrap;
 }
 
-.file-history-button.active {
-  background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
-  outline: 1px solid var(--vscode-focusBorder);
-}
-
 .clear-button:hover:not(:disabled),
 .file-history-button:hover:not(:disabled) {
   background-color: var(--vscode-button-hoverBackground);
@@ -888,29 +922,71 @@ const hasActiveFilter = computed(() => {
   overflow: auto;
 }
 
-.file-history-status {
+/* ---------------- History scope ---------------- */
+.history-scope-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-bottom: 1px solid var(--vscode-panel-border);
-  font-size: 11px;
+  padding: 8px 12px 0;
+  min-width: 0;
+  color: var(--vscode-descriptionForeground);
+  font-size: 12px;
+}
+
+.history-scope-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background-color: var(--vscode-badge-background, rgba(127, 127, 127, 0.2));
+  color: var(--vscode-badge-foreground, var(--vscode-foreground));
+  font-weight: 600;
+}
+
+.history-scope-pill.mode-line {
+  background-color: var(--vscode-editorInfo-background, rgba(55, 148, 255, 0.14));
+  color: var(--vscode-editorInfo-foreground, var(--vscode-foreground));
+}
+
+.history-scope-path {
+  flex: 1;
+  min-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--vscode-foreground);
+}
+
+.history-scope-meta {
+  flex-shrink: 1;
+  min-width: 0;
+  max-width: 34%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--vscode-descriptionForeground);
 }
 
-.file-history-exit-button {
-  margin-left: auto;
-  padding: 2px 8px;
+.history-scope-clear {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: 4px;
   border: 1px solid transparent;
-  border-radius: 3px;
-  background: transparent;
-  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  background-color: transparent;
+  color: var(--vscode-icon-foreground, var(--vscode-foreground));
   cursor: pointer;
-  font-size: 11px;
 }
 
-.file-history-exit-button:hover {
+.history-scope-clear:hover:not(:disabled) {
   background-color: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
+}
+
+.history-scope-clear:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .error {

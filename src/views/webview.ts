@@ -13,7 +13,7 @@ import { useDiffTreeView } from './diff/DiffTreeView'
 import { useFileHistory } from './fileHistory'
 
 import { useGitService } from '@/git'
-import { CHANGES_VIEW_ID, CHANNEL, HISTORY_VIEW_ID, WEBVIEW_CHANNEL } from '@/constant'
+import { CHANNEL, HISTORY_VIEW_ID, PANEL_HISTORY_VIEW_ID, WEBVIEW_CHANNEL } from '@/constant'
 import { formatError, logger } from '@/utils'
 
 import type { CommitGraph, GitBranchAction, GitBranchRef, GitHeadInfo, GitHistoryFilter } from '@/git'
@@ -146,9 +146,13 @@ export const useGitPanelView = createSingletonComposable(() => {
             </html>`
   }
 
-  const { forceRefresh, view, postMessage } = useWebviewView(
+  const {
+    forceRefresh: refreshSidebarView,
+    view: sidebarView,
+    postMessage: postSidebarMessage,
+  } = useWebviewView(
     HISTORY_VIEW_ID,
-    computed(() => getHtml(view.value?.webview)),
+    computed(() => getHtml(sidebarView.value?.webview)),
     {
       retainContextWhenHidden: true,
       webviewOptions: {
@@ -159,119 +163,161 @@ export const useGitPanelView = createSingletonComposable(() => {
           Uri.joinPath(extensionUri),
         ],
       },
-      onDidReceiveMessage: async (message: WebviewMessage) => {
-        switch (message.command) {
-          case WEBVIEW_CHANNEL.GET_HISTORY:
-            currentFilter.value = message.filter
-            await refreshHistory(message.forceRefresh, message.filter, {
-              requestId: message.requestId,
-              page: message.page,
-              resetPage: message.resetPage,
-            })
-            queueFileHistoryPost()
-            break
-
-          case WEBVIEW_CHANNEL.GET_ALL_BRANCHES:
-            await getRepoBranches()
-            break
-
-          case WEBVIEW_CHANNEL.GET_ALL_AUTHORS:
-            await getRepoAuthors()
-            break
-
-          case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
-            try {
-              const hashes = parseCommitHashes(message.commitHashes)
-              await gitChangesProvider.refresh(hashes)
-            }
-            catch (error) {
-              const errorMessage = formatError(error)
-              logger.error('Failed to show commit details:', error)
-              postMessage({
-                command: CHANNEL.ERROR,
-                message: `Failed to show commit details: ${errorMessage}`,
-              })
-            }
-            break
-
-          case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
-            await executeCommand(`${CHANGES_VIEW_ID}.focus`)
-            break
-
-          case WEBVIEW_CHANNEL.GET_FILE_HISTORY:
-            await refreshFileHistory(message.forceRefresh, message.append, false, message.followActive)
-            break
-
-          case WEBVIEW_CHANNEL.EXIT_FILE_HISTORY:
-            fileHistoryActive.value = false
-            if (fileHistoryRefreshTimer) {
-              clearTimeout(fileHistoryRefreshTimer)
-              fileHistoryRefreshTimer = undefined
-            }
-            await fileHistory.setFollowing(false)
-            break
-
-          case WEBVIEW_CHANNEL.GET_STASH_LIST:
-            await refreshStashList()
-            break
-
-          case WEBVIEW_CHANNEL.GET_GIT_REFS:
-            await refreshGitRefs()
-            break
-
-          case WEBVIEW_CHANNEL.FETCH_REMOTE:
-            await fetchRemote(message.remote)
-            break
-
-          case WEBVIEW_CHANNEL.RUN_BRANCH_ACTION:
-            await handleBranchAction(message.action, message.branch)
-            break
-
-          case WEBVIEW_CHANNEL.APPLY_STASH:
-            await handleStashAction(message.ref, 'apply')
-            break
-
-          case WEBVIEW_CHANNEL.POP_STASH:
-            await handleStashAction(message.ref, 'pop')
-            break
-
-          case WEBVIEW_CHANNEL.DROP_STASH:
-            await handleStashAction(message.ref, 'drop')
-            break
-
-          case WEBVIEW_CHANNEL.CLEAR_STASH:
-            await handleClearStash()
-            break
-
-          case WEBVIEW_CHANNEL.SHOW_STASH_DIFF:
-            await showStashDiff(message.ref)
-            break
-
-          case WEBVIEW_CHANNEL.SHOW_STASH_DETAILS:
-            try {
-              await gitChangesProvider.refreshStash({
-                ref: message.ref,
-                message: message.message,
-                branch: message.branch,
-                date: message.date,
-                authorName: message.authorName,
-                authorEmail: message.authorEmail,
-              })
-              await executeCommand(`${CHANGES_VIEW_ID}.focus`)
-            }
-            catch (error) {
-              const errorMessage = formatError(error)
-              logger.error('Failed to show stash details:', error)
-              postMessage({
-                command: CHANNEL.ERROR,
-                message: `Failed to show stash details: ${errorMessage}`,
-              })
-            }
-            break
-        }
-      },
+      onDidReceiveMessage: handleWebviewMessage,
     },
   )
+
+  const {
+    forceRefresh: refreshPanelView,
+    view: panelView,
+    postMessage: postPanelMessage,
+  } = useWebviewView(
+    PANEL_HISTORY_VIEW_ID,
+    computed(() => getHtml(panelView.value?.webview)),
+    {
+      retainContextWhenHidden: true,
+      webviewOptions: {
+        enableScripts: true,
+        enableCommandUris: true,
+        localResourceRoots: [
+          Uri.joinPath(extensionUri, '../'),
+          Uri.joinPath(extensionUri),
+        ],
+      },
+      onDidReceiveMessage: handleWebviewMessage,
+    },
+  )
+
+  function forceRefresh() {
+    refreshSidebarView()
+    refreshPanelView()
+  }
+
+  function postMessage(message: unknown) {
+    postSidebarMessage(message)
+    postPanelMessage(message)
+  }
+
+  async function focusBestHistoryView() {
+    if (panelView.value?.visible) {
+      await executeCommand(`${PANEL_HISTORY_VIEW_ID}.focus`)
+      return
+    }
+
+    await executeCommand(`${HISTORY_VIEW_ID}.focus`)
+  }
+
+  async function handleWebviewMessage(message: WebviewMessage) {
+    switch (message.command) {
+      case WEBVIEW_CHANNEL.GET_HISTORY:
+        currentFilter.value = message.filter
+        await refreshHistory(message.forceRefresh, message.filter, {
+          requestId: message.requestId,
+          page: message.page,
+          resetPage: message.resetPage,
+        })
+        queueFileHistoryPost()
+        break
+
+      case WEBVIEW_CHANNEL.GET_ALL_BRANCHES:
+        await getRepoBranches()
+        break
+
+      case WEBVIEW_CHANNEL.GET_ALL_AUTHORS:
+        await getRepoAuthors()
+        break
+
+      case WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS:
+        try {
+          const hashes = parseCommitHashes(message.commitHashes)
+          await gitChangesProvider.refresh(hashes)
+        }
+        catch (error) {
+          const errorMessage = formatError(error)
+          logger.error('Failed to show commit details:', error)
+          postMessage({
+            command: CHANNEL.ERROR,
+            message: `Failed to show commit details: ${errorMessage}`,
+          })
+        }
+        break
+
+      case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
+        await gitChangesProvider.focusChangesView()
+        break
+
+      case WEBVIEW_CHANNEL.GET_FILE_HISTORY:
+        await refreshFileHistory(message.forceRefresh, message.append, false, message.followActive)
+        break
+
+      case WEBVIEW_CHANNEL.EXIT_FILE_HISTORY:
+        fileHistoryActive.value = false
+        if (fileHistoryRefreshTimer) {
+          clearTimeout(fileHistoryRefreshTimer)
+          fileHistoryRefreshTimer = undefined
+        }
+        await fileHistory.setFollowing(false)
+        break
+
+      case WEBVIEW_CHANNEL.GET_STASH_LIST:
+        await refreshStashList()
+        break
+
+      case WEBVIEW_CHANNEL.GET_GIT_REFS:
+        await refreshGitRefs()
+        break
+
+      case WEBVIEW_CHANNEL.FETCH_REMOTE:
+        await fetchRemote(message.remote)
+        break
+
+      case WEBVIEW_CHANNEL.RUN_BRANCH_ACTION:
+        await handleBranchAction(message.action, message.branch)
+        break
+
+      case WEBVIEW_CHANNEL.APPLY_STASH:
+        await handleStashAction(message.ref, 'apply')
+        break
+
+      case WEBVIEW_CHANNEL.POP_STASH:
+        await handleStashAction(message.ref, 'pop')
+        break
+
+      case WEBVIEW_CHANNEL.DROP_STASH:
+        await handleStashAction(message.ref, 'drop')
+        break
+
+      case WEBVIEW_CHANNEL.CLEAR_STASH:
+        await handleClearStash()
+        break
+
+      case WEBVIEW_CHANNEL.SHOW_STASH_DIFF:
+        await showStashDiff(message.ref)
+        break
+
+      case WEBVIEW_CHANNEL.SHOW_STASH_DETAILS:
+        try {
+          await gitChangesProvider.refreshStash({
+            ref: message.ref,
+            message: message.message,
+            branch: message.branch,
+            date: message.date,
+            authorName: message.authorName,
+            authorEmail: message.authorEmail,
+          })
+          await gitChangesProvider.focusChangesView()
+        }
+        catch (error) {
+          const errorMessage = formatError(error)
+          logger.error('Failed to show stash details:', error)
+          postMessage({
+            command: CHANNEL.ERROR,
+            message: `Failed to show stash details: ${errorMessage}`,
+          })
+        }
+        break
+    }
+  }
 
   async function refreshHistory(
     _forceRefresh: boolean = false,
@@ -401,7 +447,7 @@ export const useGitPanelView = createSingletonComposable(() => {
       await fileHistory.refresh(forceRefresh)
 
     if (activate)
-      await executeCommand(`${HISTORY_VIEW_ID}.focus`)
+      await focusBestHistoryView()
 
     postMessage({
       command: CHANNEL.FILE_HISTORY,
@@ -681,6 +727,7 @@ export const useGitPanelView = createSingletonComposable(() => {
     getRepoAuthors,
     clearSelection,
     backToHead,
+    focusHistoryView: focusBestHistoryView,
     refreshFileHistory: async (_forceRefresh?: boolean) => {
       if (fileHistoryActive.value)
         await refreshFileHistory(_forceRefresh, false, false, false)
