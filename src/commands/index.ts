@@ -8,10 +8,10 @@ import showStatsCommand from './showStats'
 import goToCommitCommand from './goToCommit'
 import backToHeadCommand from './backToHead'
 
-import { CHANGES_VIEW_ID, EXTENSION_SYMBOL, HISTORY_VIEW_ID } from '@/constant'
+import { EXTENSION_SYMBOL, HISTORY_VIEW_ID } from '@/constant'
 import { logger } from '@/utils'
-import { useDiffTreeView } from '@/views/diff'
-import { useFileHistoryTreeView } from '@/views/fileHistory'
+import { useFileHistory } from '@/views/fileHistory'
+import { useGitPanelView } from '@/views/webview'
 
 let _commandsInitialized = false
 
@@ -20,9 +20,7 @@ export function initCommands() {
     return
 
   _commandsInitialized = true
-  const fileHistory = useFileHistoryTreeView()
-  const diffTree = useDiffTreeView()
-
+  const fileHistory = useFileHistory()
   useCommands({
     [`${EXTENSION_SYMBOL}.history`]: async () => {
       logger.info(`[command] focus ${HISTORY_VIEW_ID}`)
@@ -35,17 +33,15 @@ export function initCommands() {
     [`${EXTENSION_SYMBOL}.showStats`]: showStatsCommand,
     [`${EXTENSION_SYMBOL}.goToCommit`]: goToCommitCommand,
     [`${EXTENSION_SYMBOL}.backToHead`]: backToHeadCommand,
-    [`${EXTENSION_SYMBOL}.showFileHistory`]: fileHistory.showFileHistory,
-    [`${EXTENSION_SYMBOL}.showLineHistory`]: fileHistory.showLineHistory,
-    [`${EXTENSION_SYMBOL}.fileHistory.refresh`]: () => fileHistory.refresh(true),
-    [`${EXTENSION_SYMBOL}.fileHistory.loadMore`]: fileHistory.loadMore,
-    [`${EXTENSION_SYMBOL}.fileHistory.showFile`]: () => fileHistory.setMode('file'),
-    [`${EXTENSION_SYMBOL}.fileHistory.showLine`]: () => fileHistory.setMode('line'),
-    [`${EXTENSION_SYMBOL}.fileHistory.follow`]: () => fileHistory.setFollowing(true),
-    [`${EXTENSION_SYMBOL}.fileHistory.pin`]: () => fileHistory.setFollowing(false),
-    [`${EXTENSION_SYMBOL}.fileHistory.openCommit`]: async (hash: string) => {
-      await diffTree.refresh([hash])
-      await executeCommand(`${CHANGES_VIEW_ID}.focus`)
+    [`${EXTENSION_SYMBOL}.showFileHistory`]: async (resource?: unknown) => {
+      const shown = await fileHistory.showFileHistory(resource)
+      if (shown)
+        await useGitPanelView().postFileHistory(true)
+    },
+    [`${EXTENSION_SYMBOL}.showLineHistory`]: async (resource?: unknown) => {
+      const shown = await fileHistory.showLineHistory(resource)
+      if (shown)
+        await useGitPanelView().postFileHistory(true)
     },
   })
 }

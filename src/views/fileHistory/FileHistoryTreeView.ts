@@ -1,38 +1,20 @@
 import path from 'node:path'
-import type { TreeViewNode } from 'reactive-vscode'
-import {
-  computed,
-  extensionContext as context,
-  createSingletonComposable,
-  executeCommand,
-  ref,
-  useTreeView,
-} from 'reactive-vscode'
-import {
-  FileType,
-  ThemeIcon,
-  TreeItem,
-  TreeItemCollapsibleState,
-  Uri,
-  window,
-  workspace,
-} from 'vscode'
-import type { Disposable, TextEditor } from 'vscode'
+import { type Disposable, type TextEditor, FileType, Uri, window, workspace } from 'vscode'
+import { computed, createSingletonComposable, extensionContext as context, ref } from 'reactive-vscode'
 
 import type { Commit, GitLineHistory } from '@/git'
 import { getRelativePath, useGitService } from '@/git'
-import { EXTENSION_SYMBOL, FILE_HISTORY_VIEW_ID } from '@/constant'
 import { config } from '@/config'
-import { formatError, logger, shortHash } from '@/utils'
+import { formatError, logger } from '@/utils'
 
 export type FileHistoryMode = 'file' | 'line'
 
-interface HistoryLineRange {
+export interface HistoryLineRange {
   start: number
   end: number
 }
 
-interface HistoryTarget {
+export interface HistoryTarget {
   uri: Uri
   relativePath: string
   isDirectory: boolean
@@ -45,9 +27,6 @@ interface HistoryCommandResource {
   fsPath?: string
 }
 
-const FOLLOWING_CONTEXT = 'gitPanel.fileHistory.following'
-const MODE_CONTEXT = 'gitPanel.fileHistory.mode'
-const HAS_TARGET_CONTEXT = 'gitPanel.fileHistory.hasTarget'
 const PAGE_SIZE_FALLBACK = 45
 
 function getPageSize(): number {
@@ -97,54 +76,6 @@ function getUriFromCommandArg(value: unknown): Uri | undefined {
   return undefined
 }
 
-function formatDate(value?: string): string {
-  if (!value)
-    return ''
-
-  const timestamp = new Date(value).getTime()
-  if (Number.isNaN(timestamp))
-    return value
-
-  return new Date(timestamp).toLocaleString()
-}
-
-function formatRelativeTime(value?: string): string {
-  if (!value)
-    return ''
-
-  const timestamp = new Date(value).getTime()
-  if (Number.isNaN(timestamp))
-    return ''
-
-  const elapsed = Math.max(0, Date.now() - timestamp)
-  const minute = 60 * 1000
-  const hour = 60 * minute
-  const day = 24 * hour
-  const month = 30 * day
-  const year = 365 * day
-
-  if (elapsed < minute)
-    return 'just now'
-  if (elapsed < hour)
-    return `${Math.floor(elapsed / minute)}m ago`
-  if (elapsed < day)
-    return `${Math.floor(elapsed / hour)}h ago`
-  if (elapsed < month)
-    return `${Math.floor(elapsed / day)}d ago`
-  if (elapsed < year)
-    return `${Math.floor(elapsed / month)}mo ago`
-  return `${Math.floor(elapsed / year)}y ago`
-}
-
-function lineSuffix(lineRange?: HistoryLineRange): string {
-  if (!lineRange)
-    return ''
-
-  return lineRange.start === lineRange.end
-    ? `:${lineRange.start}`
-    : `:${lineRange.start}-${lineRange.end}`
-}
-
 function sameTarget(a: HistoryTarget | null, b: HistoryTarget | null, mode: FileHistoryMode): boolean {
   if (!a || !b)
     return a === b
@@ -159,86 +90,16 @@ function sameTarget(a: HistoryTarget | null, b: HistoryTarget | null, mode: File
     && a.lineRange?.end === b.lineRange?.end
 }
 
-class MessageNode extends TreeItem {
-  constructor(label: string, description = '', iconName = 'info') {
-    super(label, TreeItemCollapsibleState.None)
-    this.description = description
-    this.tooltip = description || label
-    this.iconPath = new ThemeIcon(iconName)
-  }
+function lineSuffix(lineRange?: HistoryLineRange): string {
+  if (!lineRange)
+    return ''
+
+  return lineRange.start === lineRange.end
+    ? `:${lineRange.start}`
+    : `:${lineRange.start}-${lineRange.end}`
 }
 
-class HistoryRootNode extends TreeItem {
-  constructor(
-    target: HistoryTarget,
-    mode: FileHistoryMode,
-    following: boolean,
-    commitCount: number,
-  ) {
-    const fileName = path.posix.basename(target.relativePath) || target.relativePath
-    const suffix = mode === 'line' ? lineSuffix(target.lineRange) : ''
-    super(`${fileName}${suffix}`, TreeItemCollapsibleState.Expanded)
-
-    this.description = following
-      ? `${commitCount} commit${commitCount === 1 ? '' : 's'}`
-      : `${commitCount} commit${commitCount === 1 ? '' : 's'} · pinned`
-    this.tooltip = `${mode === 'line' ? 'Line' : target.isDirectory ? 'Folder' : 'File'} history for ${target.relativePath}${suffix}`
-    this.iconPath = new ThemeIcon(mode === 'line' ? 'list-selection' : target.isDirectory ? 'folder' : 'file-code')
-    this.contextValue = 'git-history-root'
-  }
-}
-
-class HistoryCommitNode extends TreeItem {
-  constructor(commit: Commit) {
-    const label = commit.message || '(no commit message)'
-    super(label, TreeItemCollapsibleState.None)
-
-    const relativeTime = formatRelativeTime(commit.date)
-    const details = [
-      shortHash(commit.hash),
-      commit.authorName,
-      relativeTime,
-    ].filter(Boolean)
-
-    this.description = details.join(' · ')
-    this.tooltip = [
-      commit.message || '(no commit message)',
-      commit.hash,
-      commit.authorEmail ? `${commit.authorName} <${commit.authorEmail}>` : commit.authorName,
-      formatDate(commit.date),
-    ].filter(Boolean).join('\n')
-    this.iconPath = new ThemeIcon(commit.isMergeCommit ? 'git-merge' : 'git-commit')
-    this.contextValue = 'git-history-commit'
-    this.command = {
-      command: `${EXTENSION_SYMBOL}.fileHistory.openCommit`,
-      title: 'Show Commit Changes',
-      arguments: [commit.hash],
-    }
-  }
-}
-
-class WorkingTreeLineNode extends TreeItem {
-  constructor(history: GitLineHistory) {
-    super('Not committed yet', TreeItemCollapsibleState.None)
-    this.description = history.summary
-    this.tooltip = 'The selected line has working tree changes that have not been committed yet.'
-    this.iconPath = new ThemeIcon('diff-added')
-    this.contextValue = 'git-history-working-tree'
-  }
-}
-
-class LoadMoreNode extends TreeItem {
-  constructor() {
-    super('Load More', TreeItemCollapsibleState.None)
-    this.iconPath = new ThemeIcon('ellipsis')
-    this.command = {
-      command: `${EXTENSION_SYMBOL}.fileHistory.loadMore`,
-      title: 'Load More',
-    }
-  }
-}
-
-export const useFileHistoryTreeView = createSingletonComposable(() => {
+export const useFileHistory = createSingletonComposable(() => {
   const git = useGitService()
 
   const mode = ref<FileHistoryMode>('file')
@@ -253,13 +114,14 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
   let requestId = 0
   let updateTimer: ReturnType<typeof setTimeout> | undefined
 
-  async function setViewContext() {
-    await Promise.all([
-      executeCommand('setContext', FOLLOWING_CONTEXT, following.value),
-      executeCommand('setContext', MODE_CONTEXT, mode.value),
-      executeCommand('setContext', HAS_TARGET_CONTEXT, target.value !== null),
-    ])
-  }
+  const title = computed(() => {
+    const currentTarget = target.value
+    if (!currentTarget)
+      return mode.value === 'line' ? 'Line History' : 'File History'
+
+    const fileName = path.posix.basename(currentTarget.relativePath) || currentTarget.relativePath
+    return `${fileName}${mode.value === 'line' ? lineSuffix(currentTarget.lineRange) : ''}`
+  })
 
   async function isDirectory(uri: Uri): Promise<boolean> {
     try {
@@ -311,7 +173,6 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
       lineBlame.value = null
       hasMore.value = false
       error.value = null
-      await setViewContext()
       return
     }
 
@@ -366,14 +227,12 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
     finally {
       if (currentRequestId === requestId)
         loading.value = false
-      await setViewContext()
     }
   }
 
   async function setTarget(nextTarget: HistoryTarget | null, options: { forceRefresh?: boolean } = {}) {
     const changed = !sameTarget(target.value, nextTarget, mode.value)
     target.value = nextTarget
-    await setViewContext()
 
     if (changed || options.forceRefresh)
       await loadHistory({ forceRefresh: options.forceRefresh })
@@ -404,7 +263,7 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
     const uri = getUriFromCommandArg(resource) ?? window.activeTextEditor?.document.uri
     if (!uri) {
       window.showInformationMessage('Open a file to view its history.')
-      return
+      return false
     }
 
     mode.value = 'file'
@@ -412,12 +271,11 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
     const nextTarget = await createTarget(uri, 'file')
     if (!nextTarget) {
       window.showInformationMessage('The selected file is not inside the current repository.')
-      await setViewContext()
-      return
+      return false
     }
 
     await setTarget(nextTarget, { forceRefresh: true })
-    await executeCommand(`${FILE_HISTORY_VIEW_ID}.focus`)
+    return true
   }
 
   async function showLineHistory(resource?: unknown) {
@@ -425,7 +283,7 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
     const editor = window.activeTextEditor
     if (!uri || !editor || editor.document.uri.toString() !== uri.toString()) {
       window.showInformationMessage('Open a file and select a line to view line history.')
-      return
+      return false
     }
 
     mode.value = 'line'
@@ -433,24 +291,21 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
     const nextTarget = await createTarget(uri, 'line', editor)
     if (!nextTarget) {
       window.showInformationMessage('The selected line is not inside the current repository.')
-      await setViewContext()
-      return
+      return false
     }
 
     await setTarget(nextTarget, { forceRefresh: true })
-    await executeCommand(`${FILE_HISTORY_VIEW_ID}.focus`)
+    return true
   }
 
   async function setMode(nextMode: FileHistoryMode) {
     mode.value = nextMode
     following.value = true
-    await setViewContext()
     await updateFromActiveEditor({ forceRefresh: true })
   }
 
   async function setFollowing(enabled: boolean) {
     following.value = enabled
-    await setViewContext()
 
     if (enabled)
       await updateFromActiveEditor({ forceRefresh: true })
@@ -475,54 +330,6 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
     await loadHistory({ append: true })
   }
 
-  const treeNodes = computed<TreeViewNode[]>(() => {
-    const currentTarget = target.value
-    if (!currentTarget) {
-      return [{
-        treeItem: new MessageNode(
-          mode.value === 'line'
-            ? 'Open a file and select a line'
-            : 'Open a file to view history',
-          following.value ? 'Following the active editor' : 'History is pinned',
-          mode.value === 'line' ? 'list-selection' : 'file-code',
-        ),
-      }]
-    }
-
-    const children: TreeViewNode[] = []
-
-    if (lineBlame.value?.isUncommitted)
-      children.push({ treeItem: new WorkingTreeLineNode(lineBlame.value) })
-
-    children.push(...commits.value.map(commit => ({ treeItem: new HistoryCommitNode(commit) })))
-
-    if (loading.value && commits.value.length === 0) {
-      children.push({ treeItem: new MessageNode('Loading history...', '', 'sync') })
-    }
-    else if (error.value) {
-      children.push({ treeItem: new MessageNode('Failed to load history', error.value, 'error') })
-    }
-    else if (commits.value.length === 0 && !lineBlame.value?.isUncommitted) {
-      children.push({ treeItem: new MessageNode('No history found', '', 'history') })
-    }
-
-    if (hasMore.value)
-      children.push({ treeItem: new LoadMoreNode() })
-
-    return [{
-      treeItem: new HistoryRootNode(currentTarget, mode.value, following.value, commits.value.length),
-      children,
-    }]
-  })
-
-  const tree = useTreeView(
-    FILE_HISTORY_VIEW_ID,
-    treeNodes,
-    {
-      showCollapseAll: true,
-    },
-  )
-
   const disposables: Disposable[] = [
     window.onDidChangeActiveTextEditor(() => scheduleActiveUpdate()),
     window.onDidChangeTextEditorSelection(() => {
@@ -536,13 +343,18 @@ export const useFileHistoryTreeView = createSingletonComposable(() => {
   ]
 
   context.value?.subscriptions.push(...disposables)
-  void setViewContext()
   scheduleActiveUpdate()
 
   return {
-    tree,
     mode,
     following,
+    target,
+    title,
+    commits,
+    lineBlame,
+    loading,
+    error,
+    hasMore,
     refresh,
     loadMore,
     setMode,

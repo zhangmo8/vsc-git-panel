@@ -43,13 +43,6 @@
 | `git-panel.backToHead`             | GitPanel: Back to HEAD               |
 | `git-panel.showFileHistory`        | GitPanel: Show File History          |
 | `git-panel.showLineHistory`        | GitPanel: Show Line History          |
-| `git-panel.fileHistory.refresh`    | GitPanel: Refresh File History       |
-| `git-panel.fileHistory.showFile`   | GitPanel: Switch to File History     |
-| `git-panel.fileHistory.showLine`   | GitPanel: Switch to Line History     |
-| `git-panel.fileHistory.follow`     | GitPanel: Follow Active Editor       |
-| `git-panel.fileHistory.pin`        | GitPanel: Pin History                |
-| `git-panel.fileHistory.loadMore`   | GitPanel: Load More History          |
-| `git-panel.fileHistory.openCommit` | GitPanel: Show Commit Changes        |
 
 <!-- commands -->
 

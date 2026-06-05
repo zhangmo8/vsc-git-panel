@@ -6,6 +6,8 @@ export const WEBVIEW_CHANNEL = {
   SHOW_COMMIT_DETAILS: 'show-commit-details',
   SHOW_CHANGES_PANEL: 'show-changes-panel',
   GET_STASH_LIST: 'get-stash-list',
+  GET_FILE_HISTORY: 'get-file-history',
+  EXIT_FILE_HISTORY: 'exit-file-history',
   GET_GIT_REFS: 'get-git-refs',
   FETCH_REMOTE: 'fetch-remote',
   RUN_BRANCH_ACTION: 'run-branch-action',
@@ -25,6 +27,7 @@ export const CHANNEL = {
   CLEAR_SELECTED: 'clear-selected',
   BACK_TO_HEAD: 'back-to-head',
   ERROR: 'error',
+  FILE_HISTORY: 'file-history',
   STASH_LIST: 'stash-list',
   STASH_ACTION_RESULT: 'stash-action-result',
   GIT_REFS: 'git-refs',
@@ -33,7 +36,6 @@ export const CHANNEL = {
 export const EXTENSION_SYMBOL = 'git-panel'
 export const HISTORY_VIEW_ID = `${EXTENSION_SYMBOL}.historyView`
 export const CHANGES_VIEW_ID = `${EXTENSION_SYMBOL}.changes`
-export const FILE_HISTORY_VIEW_ID = `${EXTENSION_SYMBOL}.fileHistory`
 
 export const GIT_STATUS = {
   MODIFIED: 'M',

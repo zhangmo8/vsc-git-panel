@@ -35,8 +35,7 @@
   "activationEvents": [
     "onStartupFinished",
     "onView:git-panel.historyView",
-    "onView:git-panel.changes",
-    "onView:git-panel.fileHistory"
+    "onView:git-panel.changes"
   ],
   "contributes": {
     "viewsContainers": {
@@ -63,13 +62,6 @@
           "name": "Git Changes",
           "icon": "$(history)",
           "contextualTitle": "Changes",
-          "visibility": "visible"
-        },
-        {
-          "id": "git-panel.fileHistory",
-          "name": "File History",
-          "icon": "$(file-code)",
-          "contextualTitle": "File History",
           "visibility": "visible"
         }
       ]
@@ -128,48 +120,6 @@
         "command": "git-panel.showLineHistory",
         "title": "Show Line History",
         "icon": "$(list-selection)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.refresh",
-        "title": "Refresh File History",
-        "icon": "$(refresh)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.showFile",
-        "title": "Switch to File History",
-        "icon": "$(file-code)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.showLine",
-        "title": "Switch to Line History",
-        "icon": "$(list-selection)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.follow",
-        "title": "Follow Active Editor",
-        "icon": "$(sync)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.pin",
-        "title": "Pin History",
-        "icon": "$(pinned)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.loadMore",
-        "title": "Load More History",
-        "icon": "$(ellipsis)"
-      },
-      {
-        "category": "GitPanel",
-        "command": "git-panel.fileHistory.openCommit",
-        "title": "Show Commit Changes",
-        "icon": "$(git-commit)"
       }
     ],
     "menus": {
@@ -198,31 +148,6 @@
           "command": "git-panel.backToHead",
           "when": "view == git-panel.historyView",
           "group": "navigation@7"
-        },
-        {
-          "command": "git-panel.fileHistory.refresh",
-          "when": "view == git-panel.fileHistory",
-          "group": "navigation@1"
-        },
-        {
-          "command": "git-panel.fileHistory.showFile",
-          "when": "view == git-panel.fileHistory && gitPanel.fileHistory.mode == line",
-          "group": "navigation@2"
-        },
-        {
-          "command": "git-panel.fileHistory.showLine",
-          "when": "view == git-panel.fileHistory && gitPanel.fileHistory.mode == file",
-          "group": "navigation@2"
-        },
-        {
-          "command": "git-panel.fileHistory.pin",
-          "when": "view == git-panel.fileHistory && gitPanel.fileHistory.following && gitPanel.fileHistory.hasTarget",
-          "group": "navigation@3"
-        },
-        {
-          "command": "git-panel.fileHistory.follow",
-          "when": "view == git-panel.fileHistory && !gitPanel.fileHistory.following",
-          "group": "navigation@3"
         }
       ],
       "editor/context": [

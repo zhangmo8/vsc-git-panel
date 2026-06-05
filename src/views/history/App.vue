@@ -11,7 +11,7 @@ import { getVscodeApi } from './utils'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, CommitGraph, GitBranchAction, GitBranchRef, GitHistoryFilter, GitOperation, GitRefsSummary, StashEntry } from '@/git'
+import type { Commit, CommitGraph, GitBranchAction, GitBranchRef, GitHistoryFilter, GitLineHistory, GitOperation, GitRefsSummary, StashEntry } from '@/git'
 
 declare global {
   interface Window {
@@ -33,6 +33,16 @@ const allOperations = ref<GitOperation[]>([]) // 累积所有已加载的操作
 const hasMoreData = ref<boolean>(true) // 是否还有更多数据
 const availableBranches = ref<string[]>([]) // 可用分支
 const availableAuthors = ref<string[]>([]) // 可用作者
+const isFileHistoryMode = ref<boolean>(false)
+const fileHistoryCommits = ref<Commit[]>([])
+const fileHistoryLineBlame = ref<GitLineHistory | null>(null)
+const isFileHistoryLoading = ref<boolean>(false)
+const fileHistoryHasMore = ref<boolean>(false)
+const fileHistoryError = ref<string>('')
+const fileHistoryTitle = ref<string>('File History')
+const fileHistoryTarget = ref<{ relativePath: string, isDirectory: boolean, lineRange?: { start: number, end: number } } | null>(null)
+const fileHistoryFollowing = ref<boolean>(true)
+const fileHistoryViewMode = ref<'file' | 'line'>('file')
 // VSCode webview API
 const vscode = getVscodeApi()
 window.vscode = vscode
@@ -162,17 +172,14 @@ function switchTab(tab: TabKey) {
 function applyFilter(resetPage: boolean = true) {
   const filter: GitHistoryFilter = {}
 
-  if (searchText.value.trim()) {
+  if (searchText.value.trim())
     filter.search = searchText.value.trim()
-  }
 
-  if (selectedBranch.value) {
+  if (selectedBranch.value)
     filter.branches = [selectedBranch.value]
-  }
 
-  if (selectedAuthor.value) {
+  if (selectedAuthor.value)
     filter.author = selectedAuthor.value
-  }
 
   if (resetPage) {
     currentPage.value = 1
@@ -206,9 +213,8 @@ function handleSearchClick() {
 
 // 处理回车键搜索
 function handleSearchKeyup(event: KeyboardEvent) {
-  if (event.key === 'Enter') {
+  if (event.key === 'Enter')
     applyFilter(true) // 搜索时重置页面
-  }
 }
 
 // 清除筛选
@@ -216,6 +222,7 @@ function clearFilter() {
   searchText.value = ''
   selectedBranch.value = ''
   selectedAuthor.value = ''
+  isFileHistoryMode.value = false
   currentPage.value = 1 // 重置页面
   allCommits.value = [] // 清空累积数据
   hasMoreData.value = true // 重置数据状态
@@ -230,6 +237,40 @@ function loadMoreData() {
 
   currentPage.value++
   applyFilter(false)
+}
+
+function loadFileHistory(append = false, followActive = false) {
+  if (isFileHistoryLoading.value)
+    return
+
+  isFileHistoryLoading.value = true
+  fileHistoryError.value = ''
+  vscode.postMessage({
+    command: WEBVIEW_CHANNEL.GET_FILE_HISTORY,
+    forceRefresh: !append,
+    append,
+    followActive,
+  })
+}
+
+function enterFileHistory() {
+  isFileHistoryMode.value = true
+  selectedCommitHashes.value = []
+  loadFileHistory(false, true)
+}
+
+function exitFileHistory() {
+  isFileHistoryMode.value = false
+  selectedCommitHashes.value = []
+  fileHistoryError.value = ''
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.EXIT_FILE_HISTORY })
+}
+
+function loadMoreFileHistory() {
+  if (!fileHistoryHasMore.value || isFileHistoryLoading.value)
+    return
+
+  loadFileHistory(true)
 }
 
 watch(() => selectedBranch.value, () => {
@@ -279,23 +320,56 @@ window.addEventListener('message', (event: { data: any }) => {
       const _commits = toRaw(allCommits.value) || []
       const _operations = toRaw(allOperations.value) || []
 
-      const responsePage = typeof message.page === 'number' ? message.page : currentPage.value
-      const shouldReset = message.resetPage === true || responsePage === 1
+      // Append only on an explicit load-more (resetPage === false). Every other
+      // refresh (auto refresh on git change, initial load, jump-to-commit)
+      // rebuilds the list from page 1, so stale pages can't be appended.
+      const shouldReset = message.resetPage !== false
 
       if (shouldReset) {
         allCommits.value = [...newCommits]
         allOperations.value = [...newOperations]
+        currentPage.value = 1
       }
       else {
-        allCommits.value = [..._commits, ...newCommits]
-        allOperations.value = [..._operations, ...newOperations]
+        // Guard against duplicates if a page is delivered twice (e.g. a refresh
+        // racing a load-more): only append commits not already present, keeping
+        // the parallel operations array aligned by index.
+        const seen = new Set(_commits.map(commit => commit.hash))
+        const freshCommits: typeof newCommits = []
+        const freshOperations: typeof newOperations = []
+        newCommits.forEach((commit, index) => {
+          if (seen.has(commit.hash))
+            return
+          freshCommits.push(commit)
+          if (newOperations[index] !== undefined)
+            freshOperations.push(newOperations[index])
+        })
+
+        allCommits.value = [..._commits, ...freshCommits]
+        allOperations.value = [..._operations, ...freshOperations]
       }
 
+      // A full page from git means there may be more; a partial page means
+      // we've reached the end. Use the raw response count (before dedup) so
+      // that a race-induced duplicate doesn't incorrectly signal "no more".
       hasMoreData.value = newCommits.length === pageSize.value
 
       isLoading.value = false // 停止加载状态
       break
     }
+    case CHANNEL.FILE_HISTORY:
+      fileHistoryCommits.value = message.commits || []
+      fileHistoryLineBlame.value = message.lineBlame || null
+      isFileHistoryLoading.value = !!message.loading
+      fileHistoryHasMore.value = !!message.hasMore
+      fileHistoryError.value = message.error || ''
+      fileHistoryTitle.value = message.title || 'File History'
+      fileHistoryTarget.value = message.target || null
+      fileHistoryFollowing.value = message.following !== false
+      fileHistoryViewMode.value = message.mode || 'file'
+      if (message.active)
+        isFileHistoryMode.value = true
+      break
     case CHANNEL.CLEAR_SELECTED:
       selectedCommitHashes.value = []
       break
@@ -321,8 +395,12 @@ window.addEventListener('message', (event: { data: any }) => {
       if (typeof message.requestId === 'number' && message.requestId !== latestHistoryRequestId) {
         break
       }
-      error.value = message.message
+      if (isFileHistoryMode.value)
+        fileHistoryError.value = message.message
+      else
+        error.value = message.message
       isLoading.value = false // 出错时也停止加载状态
+      isFileHistoryLoading.value = false
       isStashLoading.value = false
       isRefsLoading.value = false
       fetchingRemote.value = ''
@@ -343,9 +421,34 @@ const transformedCommits = computed(() => {
   return Array.from(allCommits.value || []) || []
 })
 
+const transformedFileHistoryCommits = computed(() => {
+  return Array.from(fileHistoryCommits.value || []) || []
+})
+
+const fileHistoryGraphData = computed(() => {
+  return transformedFileHistoryCommits.value.map(commit => ({
+    type: commit.isMergeCommit ? 'merge' : 'commit',
+    branch: fileHistoryTitle.value,
+    hash: commit.hash,
+    message: commit.message,
+    branchChanged: false,
+  } as GitOperation))
+})
+
+const fileHistoryStatusText = computed(() => {
+  if (!fileHistoryTarget.value)
+    return fileHistoryViewMode.value === 'line' ? 'Open a file and select a line' : 'Open a file to view history'
+
+  const targetType = fileHistoryViewMode.value === 'line'
+    ? 'Line'
+    : fileHistoryTarget.value.isDirectory ? 'Folder' : 'File'
+  const followState = fileHistoryFollowing.value ? 'following active editor' : 'pinned'
+  return `${targetType}: ${fileHistoryTarget.value.relativePath} · ${followState}`
+})
+
 // 计算筛选状态
 const hasActiveFilter = computed(() => {
-  return searchText.value.trim() || selectedBranch.value || selectedAuthor.value
+  return searchText.value.trim() || selectedBranch.value || selectedAuthor.value || isFileHistoryMode.value
 })
 </script>
 
@@ -450,10 +553,22 @@ const hasActiveFilter = computed(() => {
             :disabled="isLoading"
           />
           <button
+            class="file-history-button"
+            :class="{ active: isFileHistoryMode }"
+            :disabled="isLoading"
+            title="Show current file history"
+            @click="isFileHistoryMode ? exitFileHistory() : enterFileHistory()"
+          >
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M3 1.5C3 .672 3.672 0 4.5 0h4.086c.398 0 .78.158 1.061.44l2.914 2.913c.281.282.439.663.439 1.061V14.5c0 .828-.672 1.5-1.5 1.5h-7A1.5 1.5 0 0 1 3 14.5v-13ZM4.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H9.5A1.5 1.5 0 0 1 8 3.5V1H4.5Zm4.5.207V3.5a.5.5 0 0 0 .5.5h2.293L9 1.207ZM5.5 7a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Zm0 2a.5.5 0 0 1 .5-.5h4a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Zm0 2a.5.5 0 0 1 .5-.5h2a.5.5 0 0 1 0 1H6a.5.5 0 0 1-.5-.5Z" />
+            </svg>
+            <span>File History</span>
+          </button>
+          <button
             v-if="hasActiveFilter"
             class="clear-button"
             title="Clear filter"
-            :disabled="isLoading"
+            :disabled="isLoading || isFileHistoryLoading"
             @click="clearFilter"
           >
             ✕
@@ -461,7 +576,40 @@ const hasActiveFilter = computed(() => {
         </div>
       </div>
 
-      <template v-if="!isLoading && transformedCommits.length === 0">
+      <template v-if="isFileHistoryMode">
+        <div class="file-history-status">
+          <span class="status-pill">
+            <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+              <path d="M3 1.5C3 .672 3.672 0 4.5 0h4.086c.398 0 .78.158 1.061.44l2.914 2.913c.281.282.439.663.439 1.061V14.5c0 .828-.672 1.5-1.5 1.5h-7A1.5 1.5 0 0 1 3 14.5v-13ZM4.5 1a.5.5 0 0 0-.5.5v13a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5V5H9.5A1.5 1.5 0 0 1 8 3.5V1H4.5Z" />
+            </svg>
+            {{ fileHistoryTitle }}
+          </span>
+          <span class="status-hint">{{ fileHistoryStatusText }}</span>
+          <button
+            class="file-history-exit-button"
+            title="Back to full history"
+            @click="exitFileHistory"
+          >
+            Back
+          </button>
+          <span v-if="fileHistoryLineBlame?.isUncommitted" class="status-hint">Not committed yet</span>
+        </div>
+        <template v-if="!isFileHistoryLoading && transformedFileHistoryCommits.length === 0">
+          <Empty class="git-graph-container" />
+        </template>
+        <template v-else>
+          <CommitTable
+            v-model="selectedCommitHashes"
+            :commits="transformedFileHistoryCommits"
+            :graph-data="fileHistoryGraphData"
+            :has-more-data="fileHistoryHasMore"
+            :is-loading="isFileHistoryLoading"
+            :on-load-more="loadMoreFileHistory"
+            class="git-graph-container"
+          />
+        </template>
+      </template>
+      <template v-else-if="!isLoading && transformedCommits.length === 0">
         <Empty class="git-graph-container" />
       </template>
       <template v-else>
@@ -470,6 +618,7 @@ const hasActiveFilter = computed(() => {
           :commits="transformedCommits"
           :graph-data="allOperations"
           :has-more-data="hasMoreData"
+          :is-loading="isLoading"
           :on-load-more="loadMoreData"
           :scroll-to-hash="scrollToHash"
           class="git-graph-container"
@@ -609,8 +758,8 @@ const hasActiveFilter = computed(() => {
       />
     </template>
 
-    <div v-if="error" class="error">
-      {{ error }}
+    <div v-if="error || fileHistoryError" class="error">
+      {{ isFileHistoryMode ? fileHistoryError : error }}
     </div>
   </div>
 </template>
@@ -698,7 +847,8 @@ const hasActiveFilter = computed(() => {
   justify-content: center;
 }
 
-.clear-button {
+.clear-button,
+.file-history-button {
   padding: 4px 8px;
   border: 1px solid var(--vscode-button-border);
   background-color: var(--vscode-button-background);
@@ -710,11 +860,25 @@ const hasActiveFilter = computed(() => {
   transition: background-color 0.2s ease;
 }
 
-.clear-button:hover:not(:disabled) {
+.file-history-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.file-history-button.active {
+  background-color: var(--vscode-button-secondaryBackground, var(--vscode-button-background));
+  outline: 1px solid var(--vscode-focusBorder);
+}
+
+.clear-button:hover:not(:disabled),
+.file-history-button:hover:not(:disabled) {
   background-color: var(--vscode-button-hoverBackground);
 }
 
-.clear-button:disabled {
+.clear-button:disabled,
+.file-history-button:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -722,6 +886,31 @@ const hasActiveFilter = computed(() => {
 .git-graph-container {
   flex: 1;
   overflow: auto;
+}
+
+.file-history-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-bottom: 1px solid var(--vscode-panel-border);
+  font-size: 11px;
+  color: var(--vscode-descriptionForeground);
+}
+
+.file-history-exit-button {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--vscode-textLink-foreground, var(--vscode-foreground));
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.file-history-exit-button:hover {
+  background-color: var(--vscode-toolbar-hoverBackground, rgba(127, 127, 127, 0.15));
 }
 
 .error {

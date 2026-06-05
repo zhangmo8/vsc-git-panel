@@ -10,6 +10,7 @@ import {
 } from 'reactive-vscode'
 
 import { useDiffTreeView } from './diff/DiffTreeView'
+import { useFileHistory } from './fileHistory'
 
 import { useGitService } from '@/git'
 import { CHANGES_VIEW_ID, CHANNEL, HISTORY_VIEW_ID, WEBVIEW_CHANNEL } from '@/constant'
@@ -47,6 +48,8 @@ type WebviewMessage =
   | { command: typeof WEBVIEW_CHANNEL.GET_ALL_AUTHORS }
   | CommitDetailsMessage
   | { command: typeof WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL }
+  | { command: typeof WEBVIEW_CHANNEL.GET_FILE_HISTORY, append?: boolean, forceRefresh?: boolean, followActive?: boolean }
+  | { command: typeof WEBVIEW_CHANNEL.EXIT_FILE_HISTORY }
   | { command: typeof WEBVIEW_CHANNEL.GET_STASH_LIST }
   | { command: typeof WEBVIEW_CHANNEL.GET_GIT_REFS }
   | { command: typeof WEBVIEW_CHANNEL.FETCH_REMOTE, remote: string }
@@ -86,6 +89,7 @@ export const useGitPanelView = createSingletonComposable(() => {
   }
 
   const gitChangesProvider = useDiffTreeView()
+  const fileHistory = useFileHistory()
   const commits = ref<CommitGraph>({
     operations: [],
     branches: [],
@@ -96,6 +100,8 @@ export const useGitPanelView = createSingletonComposable(() => {
     },
   })
   const currentFilter = ref<GitHistoryFilter | undefined>(undefined)
+  const fileHistoryActive = ref(false)
+  let fileHistoryRefreshTimer: ReturnType<typeof setTimeout> | undefined
 
   const isDev = context.value?.extensionMode === ExtensionMode.Development
 
@@ -162,6 +168,7 @@ export const useGitPanelView = createSingletonComposable(() => {
               page: message.page,
               resetPage: message.resetPage,
             })
+            queueFileHistoryPost()
             break
 
           case WEBVIEW_CHANNEL.GET_ALL_BRANCHES:
@@ -189,6 +196,19 @@ export const useGitPanelView = createSingletonComposable(() => {
 
           case WEBVIEW_CHANNEL.SHOW_CHANGES_PANEL:
             await executeCommand(`${CHANGES_VIEW_ID}.focus`)
+            break
+
+          case WEBVIEW_CHANNEL.GET_FILE_HISTORY:
+            await refreshFileHistory(message.forceRefresh, message.append, false, message.followActive)
+            break
+
+          case WEBVIEW_CHANNEL.EXIT_FILE_HISTORY:
+            fileHistoryActive.value = false
+            if (fileHistoryRefreshTimer) {
+              clearTimeout(fileHistoryRefreshTimer)
+              fileHistoryRefreshTimer = undefined
+            }
+            await fileHistory.setFollowing(false)
             break
 
           case WEBVIEW_CHANNEL.GET_STASH_LIST:
@@ -259,7 +279,17 @@ export const useGitPanelView = createSingletonComposable(() => {
     meta?: { requestId?: number, page?: number, resetPage?: boolean },
   ) {
     try {
-      const filterToUse = filter !== undefined ? filter : currentFilter.value
+      const baseFilter = filter !== undefined ? filter : currentFilter.value
+
+      // When no pagination meta is provided (git-change auto refresh, initial
+      // load, jump-to-commit), reload from the first page and tell the webview
+      // to reset. Only an explicit load-more (resetPage === false) appends, so
+      // an accumulated list never gets a stale page appended onto it.
+      const isReset = meta?.resetPage ?? true
+      const responsePage = isReset ? 1 : (meta?.page ?? 1)
+      const filterToUse = isReset
+        ? { ...(baseFilter ?? {}), page: 1 }
+        : baseFilter
 
       // Pass forceRefresh to git service to invalidate cache if needed
       const { logResult, operations, branches } = await git.getHistory(filterToUse, _forceRefresh)
@@ -277,8 +307,8 @@ export const useGitPanelView = createSingletonComposable(() => {
         command: CHANNEL.HISTORY,
         commits: commits.value,
         requestId: meta?.requestId,
-        page: meta?.page,
-        resetPage: meta?.resetPage,
+        page: responsePage,
+        resetPage: isReset,
       })
     }
     catch (error) {
@@ -342,6 +372,55 @@ export const useGitPanelView = createSingletonComposable(() => {
     postMessage({
       command: CHANNEL.BACK_TO_HEAD,
       head,
+    })
+  }
+
+  function queueFileHistoryPost() {
+    if (!fileHistoryActive.value)
+      return
+
+    if (fileHistoryRefreshTimer)
+      clearTimeout(fileHistoryRefreshTimer)
+
+    fileHistoryRefreshTimer = setTimeout(() => {
+      void refreshFileHistory(false, false, false, false).catch((error) => {
+        logger.warn('Failed to post refreshed file history:', error)
+      })
+    }, 220)
+  }
+
+  async function refreshFileHistory(forceRefresh = true, append = false, activate = false, followActive = false) {
+    fileHistoryActive.value = true
+
+    if (followActive)
+      await fileHistory.setFollowing(true)
+
+    if (append)
+      await fileHistory.loadMore()
+    else
+      await fileHistory.refresh(forceRefresh)
+
+    if (activate)
+      await executeCommand(`${HISTORY_VIEW_ID}.focus`)
+
+    postMessage({
+      command: CHANNEL.FILE_HISTORY,
+      active: true,
+      commits: fileHistory.commits.value,
+      lineBlame: fileHistory.lineBlame.value,
+      loading: fileHistory.loading.value,
+      error: fileHistory.error.value,
+      hasMore: fileHistory.hasMore.value,
+      target: fileHistory.target.value
+        ? {
+            relativePath: fileHistory.target.value.relativePath,
+            isDirectory: fileHistory.target.value.isDirectory,
+            lineRange: fileHistory.target.value.lineRange,
+          }
+        : null,
+      mode: fileHistory.mode.value,
+      following: fileHistory.following.value,
+      title: fileHistory.title.value,
     })
   }
 
@@ -602,6 +681,11 @@ export const useGitPanelView = createSingletonComposable(() => {
     getRepoAuthors,
     clearSelection,
     backToHead,
+    refreshFileHistory: async (_forceRefresh?: boolean) => {
+      if (fileHistoryActive.value)
+        await refreshFileHistory(_forceRefresh, false, false, false)
+    },
+    postFileHistory: (activate = false) => refreshFileHistory(false, false, activate, false),
     refreshStashList,
     refreshGitRefs,
     fetchRemote,
