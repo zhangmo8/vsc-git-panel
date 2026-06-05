@@ -6,8 +6,11 @@ import Empty from './components/Empty.vue'
 import FilterSelect from './components/FilterSelect.vue'
 import RefPanel from './components/Refs/RefPanel.vue'
 import StashItem from './components/StashItem.vue'
+import { DEFAULT_COLUMN_VISIBILITY } from './components/CommitTable/columns'
 
 import { getVscodeApi } from './utils'
+
+import type { ColumnVisibility } from './components/CommitTable/columns'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
@@ -43,6 +46,7 @@ const fileHistoryTitle = ref<string>('File History')
 const fileHistoryTarget = ref<{ relativePath: string, isDirectory: boolean, lineRange?: { start: number, end: number } } | null>(null)
 const fileHistoryFollowing = ref<boolean>(true)
 const fileHistoryViewMode = ref<'file' | 'line'>('file')
+const historyColumnVisibility = ref<ColumnVisibility>({ ...DEFAULT_COLUMN_VISIBILITY })
 // VSCode webview API
 const vscode = getVscodeApi()
 window.vscode = vscode
@@ -639,6 +643,7 @@ const hasSearchFilter = computed(() => {
         <template v-else>
           <CommitTable
             v-model="selectedCommitHashes"
+            v-model:column-visibility="historyColumnVisibility"
             :commits="transformedFileHistoryCommits"
             :graph-data="fileHistoryGraphData"
             :has-more-data="fileHistoryHasMore"
@@ -654,6 +659,7 @@ const hasSearchFilter = computed(() => {
       <template v-else>
         <CommitTable
           v-model="selectedCommitHashes"
+          v-model:column-visibility="historyColumnVisibility"
           :commits="transformedCommits"
           :graph-data="allOperations"
           :has-more-data="hasMoreData"
