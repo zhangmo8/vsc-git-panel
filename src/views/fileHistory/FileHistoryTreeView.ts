@@ -1,6 +1,7 @@
 import path from 'node:path'
-import { type Disposable, type TextEditor, FileType, Uri, window, workspace } from 'vscode'
-import { computed, createSingletonComposable, extensionContext as context, ref } from 'reactive-vscode'
+import type { Disposable, TextEditor } from 'vscode'
+import { FileType, Uri, window, workspace } from 'vscode'
+import { computed, extensionContext as context, createSingletonComposable, ref } from 'reactive-vscode'
 
 import type { Commit, GitLineHistory } from '@/git'
 import { getRelativePath, useGitService } from '@/git'
