@@ -93,6 +93,18 @@
       },
       {
         "category": "GitPanel",
+        "command": "git-panel.openCommitOnWeb",
+        "title": "Open Commit on Web",
+        "icon": "$(globe)"
+      },
+      {
+        "category": "GitPanel",
+        "command": "git-panel.openCommitDiff",
+        "title": "Open Commit Changes (Diff)",
+        "icon": "$(git-compare)"
+      },
+      {
+        "category": "GitPanel",
         "command": "git-panel.showStats",
         "title": "Show Repository Statistics",
         "icon": "$(graph)"

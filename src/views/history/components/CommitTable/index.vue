@@ -14,6 +14,7 @@ const props = defineProps<{
   commits: Commit[]
   graphData: GitOperation[]
   hasMoreData?: boolean
+  isLoading?: boolean
   onLoadMore?: () => void
   scrollToHash?: string
 }>()
@@ -311,6 +312,19 @@ const processedRows = computed(() => {
   return rows
 })
 
+const LOADING_ROW_ID = '__loading-more__'
+
+// Rows actually fed to the scroller: commit rows plus a trailing loading
+// sentinel while a load-more request is in flight, so the indicator lives
+// inside the scroll area and appears at the bottom as you reach it.
+const displayRows = computed(() => {
+  const rows = processedRows.value
+  if (props.isLoading && props.hasMoreData && rows.length > 0)
+    return [...rows, { id: LOADING_ROW_ID, loading: true as const }]
+
+  return rows
+})
+
 // const activeBranches = computed(() => {
 //   // const branches = new Set<string>()
 //   return []
@@ -437,7 +451,7 @@ watch(
       <RecycleScroller
         ref="scrollerRef"
         v-slot="{ item: row, index }"
-        :items="processedRows"
+        :items="displayRows"
         :item-size="32"
         key-field="id"
         class="commit-scroller"
@@ -446,7 +460,12 @@ watch(
         emit-update
         @update="handleVisibleRangeUpdate"
       >
+        <div v-if="row.loading" class="loading-row">
+          <span class="loading-spinner" />
+          <span class="loading-text">Loading more commits…</span>
+        </div>
         <ListItem
+          v-else
           :key="row.id"
           :commit="row.commit"
           :graph="row.graph"
@@ -463,11 +482,6 @@ watch(
           @mouseover="() => isDragging && handleMouseOver(index)"
         />
       </RecycleScroller>
-      <div v-if="hasMoreData" class="loading-trigger">
-        <div class="loading-text">
-          Loading more commits...
-        </div>
-      </div>
     </div>
   </div>
 </template>
@@ -522,15 +536,29 @@ watch(
   overflow: visible;
 }
 
-.loading-trigger {
-  text-align: center;
-  padding: 8px 0;
-  flex-shrink: 0;
-}
-
-.loading-text {
+.loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 32px;
   font-size: 12px;
   color: var(--vscode-descriptionForeground);
+}
+
+.loading-spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--vscode-descriptionForeground);
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: loading-spin 0.7s linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .being-dragged {

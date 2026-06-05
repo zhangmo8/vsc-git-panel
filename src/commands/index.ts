@@ -4,6 +4,8 @@ import refreshCommand from './refresh'
 import diffCommand from './diff'
 import clearCommand from './clear'
 import copyHashCommand from './copyHash'
+import openCommitOnWebCommand from './openCommitOnWeb'
+import openCommitDiffCommand from './openCommitDiff'
 import showStatsCommand from './showStats'
 import goToCommitCommand from './goToCommit'
 import backToHeadCommand from './backToHead'
@@ -30,6 +32,8 @@ export function initCommands() {
     [`${EXTENSION_SYMBOL}.openDiff`]: diffCommand(),
     [`${EXTENSION_SYMBOL}.history.clear`]: clearCommand,
     [`${EXTENSION_SYMBOL}.copyHash`]: copyHashCommand,
+    [`${EXTENSION_SYMBOL}.openCommitOnWeb`]: openCommitOnWebCommand,
+    [`${EXTENSION_SYMBOL}.openCommitDiff`]: openCommitDiffCommand,
     [`${EXTENSION_SYMBOL}.showStats`]: showStatsCommand,
     [`${EXTENSION_SYMBOL}.goToCommit`]: goToCommitCommand,
     [`${EXTENSION_SYMBOL}.backToHead`]: backToHeadCommand,

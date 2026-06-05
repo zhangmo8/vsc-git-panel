@@ -33,8 +33,9 @@ interface CachedLineHistory {
 
 const HISTORY_CACHE_TTL = 30_000
 const MAX_HISTORY_CACHE_SIZE = 300
-const HOVER_MIN_WIDTH = 560
-const HOVER_MAX_HEIGHT = 360
+const HOVER_MIN_WIDTH = 600
+const HOVER_MAX_HEIGHT = 380
+const HOVER_AVATAR_SIZE = 42
 const HOVER_MAX_CHARACTER = 2 ** 30 - 1
 
 let initialized = false
@@ -157,6 +158,8 @@ function createHoverMessage(
   markdown.isTrusted = {
     enabledCommands: [
       `${EXTENSION_SYMBOL}.copyHash`,
+      `${EXTENSION_SYMBOL}.openCommitOnWeb`,
+      `${EXTENSION_SYMBOL}.openCommitDiff`,
     ],
   }
   appendHoverScrollStart(markdown)
@@ -174,36 +177,59 @@ function createHoverMessage(
   }
 
   const relativeTime = formatRelativeTime(history.authorDate)
-  const author = history.authorEmail
-    ? `${history.authorName} (${history.authorEmail})`
-    : history.authorName
   const copyUri = createCommandUri(`${EXTENSION_SYMBOL}.copyHash`, [history.hash])
-  const commitLabel = `$(git-commit) ${htmlColor(history.shortHash, 'gitDecoration-addedResourceForeground')}`
-  const changesLabel = history.previousLineText === undefined ? 'Changes added in' : 'Changes'
+  const openWebUri = createCommandUri(`${EXTENSION_SYMBOL}.openCommitOnWeb`, [history.hash])
+  const openDiffUri = createCommandUri(`${EXTENSION_SYMBOL}.openCommitDiff`, [{
+    hash: history.hash,
+    filePath: history.filePath || relativePath,
+  }])
+  const changesLabel = history.previousLineText === undefined ? 'Changes added in this commit' : 'Changes in this commit'
   const avatarUrl = getAuthorAvatarUrl(history)
   const avatarHtml = avatarUrl
-    ? `<img src="${escapeHtml(avatarUrl)}" width="36" height="36" style="border-radius: 50%; vertical-align: middle;" />`
+    ? `<img src="${escapeHtml(avatarUrl)}" width="${HOVER_AVATAR_SIZE}" height="${HOVER_AVATAR_SIZE}" style="border-radius: 50%;" />`
     : ''
 
+  const committedMeta = [
+    htmlColor('committed', 'descriptionForeground'),
+    relativeTime ? htmlColor(`· ${relativeTime}`, 'descriptionForeground') : '',
+  ].filter(Boolean).join(' ')
+
+  // Header — avatar, author + email, and "committed · <relative time>"
   markdown.appendMarkdown([
     `<table style="min-width: ${HOVER_MIN_WIDTH}px; border-spacing: 0;">`,
     '<tr>',
-    `<td style="width: 46px; padding-right: 10px; vertical-align: top;">${avatarHtml}</td>`,
-    '<td style="vertical-align: top;">',
-    `<div><strong>${htmlColor(author, 'foreground')}</strong>${relativeTime ? ` &nbsp;&nbsp; $(clock) ${htmlColor(relativeTime, 'descriptionForeground')}` : ''}</div>`,
-    `<div style="margin-top: 4px;">${htmlColor(history.summary, 'foreground')}</div>`,
+    `<td style="width: ${HOVER_AVATAR_SIZE + 16}px; padding-right: 16px; vertical-align: top;">${avatarHtml}</td>`,
+    '<td style="vertical-align: top; padding-top: 1px;">',
+    `<div><strong>${htmlColor(history.authorName, 'foreground')}</strong>${history.authorEmail ? ` &nbsp; ${htmlColor(history.authorEmail, 'descriptionForeground')}` : ''}</div>`,
+    `<div style="margin-top: 5px;">$(git-commit) ${committedMeta}</div>`,
     '</td>',
     '</tr>',
     '</table>',
   ].join(''))
+
+  // Commit message, given room to breathe
+  markdown.appendMarkdown('\n\n')
+  markdown.appendMarkdown(`<div style="margin: 6px 0 8px 0;">${htmlColor(history.summary, 'foreground')}</div>`)
+
+  // Diff of the hovered line
   markdown.appendMarkdown('\n\n')
   markdown.appendMarkdown('---\n\n')
+  markdown.appendMarkdown(`<div style="margin-bottom: 6px;">${htmlColor(changesLabel, 'descriptionForeground')}</div>\n\n`)
   markdown.appendCodeblock(getDiffLines(history, lineText).join('\n'), 'diff')
+
+  // Commit reference + actions
   markdown.appendMarkdown('\n')
   markdown.appendMarkdown('---\n\n')
-  markdown.appendMarkdown(`${changesLabel} ${commitLabel} &nbsp;&nbsp;|&nbsp;&nbsp; [$(copy) Copy](${copyUri} "Copy Commit Hash")`)
-  markdown.appendMarkdown(`\n\n$(file-code) ${htmlColor(`${relativePath}:${lineNumber}`, 'descriptionForeground')}`)
+  const commitLabel = `$(git-commit) ${htmlColor(history.shortHash, 'gitDecoration-addedResourceForeground')}`
+  const actions = [
+    `[$(git-compare)](${openDiffUri} "Open Changes (Diff with Previous Commit)")`,
+    `[$(copy)](${copyUri} "Copy Commit Hash")`,
+    `[$(globe)](${openWebUri} "Open Commit on Web")`,
+  ].join(' &nbsp;&nbsp; ')
+  markdown.appendMarkdown(`${commitLabel} &nbsp;&nbsp;&nbsp;&nbsp; ${actions}`)
 
+  // Footer — file location and full date, muted
+  markdown.appendMarkdown(`\n\n$(file-code) ${htmlColor(`${relativePath}:${lineNumber}`, 'descriptionForeground')}`)
   if (history.authorDate)
     markdown.appendMarkdown(` &nbsp;&nbsp; $(calendar) ${htmlColor(formatFullDate(history.authorDate), 'descriptionForeground')}`)
 
@@ -226,8 +252,7 @@ export function initLineHistory() {
   const git = useGitService()
   const decorationType = window.createTextEditorDecorationType({
     after: {
-      color: new ThemeColor('editorCodeLens.foreground'),
-      fontStyle: 'italic',
+      color: new ThemeColor('disabledForeground'),
       margin: '0 0 0 1.25em',
     },
     rangeBehavior: DecorationRangeBehavior.ClosedClosed,

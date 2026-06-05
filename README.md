@@ -38,6 +38,8 @@
 | `git-panel.history.clear`          | GitPanel: Clear Selection            |
 | `git-panel.history.refresh`        | GitPanel: Refresh History            |
 | `git-panel.copyHash`               | GitPanel: Copy Commit Hash           |
+| `git-panel.openCommitOnWeb`        | GitPanel: Open Commit on Web         |
+| `git-panel.openCommitDiff`         | GitPanel: Open Commit Changes (Diff) |
 | `git-panel.showStats`              | GitPanel: Show Repository Statistics |
 | `git-panel.goToCommit`             | GitPanel: Go to Commit by Hash       |
 | `git-panel.backToHead`             | GitPanel: Back to HEAD               |

@@ -12,6 +12,8 @@ import {
   parseRawGitLog,
 } from './historyUtils'
 import { parseGitBlameLine, parseGitDiffPreviousLine } from './lineHistoryUtils'
+import { buildCommitWebUrl, parseFileRevisions } from './utils'
+import type { FileRevision } from './utils'
 import { logger, parseGitStatus } from '@/utils'
 import { config } from '@/config'
 import { GIT_STATUS } from '@/constant'
@@ -242,6 +244,33 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  /**
+   * Resolve the diff endpoints for a file as of `hash`: the commit `hash`
+   * itself (or the newest commit that touched the file up to `hash`) and the
+   * previous commit in that file's own history. Follows renames, so it is not
+   * confused by merge commits or parents that never touched the file.
+   */
+  async function getFileChangeRefs(
+    hash: string,
+    filePath: string,
+  ): Promise<{ current: FileRevision, previous: FileRevision | null } | null> {
+    const raw = await git
+      .raw(['log', '--follow', '--format=%H', '--name-status', hash, '--', filePath])
+      .catch(() => '')
+
+    const revisions = parseFileRevisions(raw)
+    if (revisions.length === 0)
+      return null
+
+    const matchedIndex = revisions.findIndex(rev => rev.commit === hash)
+    const currentIndex = matchedIndex === -1 ? 0 : matchedIndex
+
+    return {
+      current: revisions[currentIndex],
+      previous: revisions[currentIndex + 1] ?? null,
+    }
+  }
+
   async function getHeadInfo(): Promise<GitHeadInfo | null> {
     try {
       const [hashResult, branchResult] = await Promise.all([
@@ -387,6 +416,24 @@ export const useGitService = createSingletonComposable(() => {
   async function getRemoteNames(): Promise<string[]> {
     const remotes = await getConfiguredRemotes()
     return remotes.map(remote => remote.name)
+  }
+
+  /**
+   * Resolve a browser URL for the given commit using the repository's
+   * default remote (preferring `origin`). Returns null when there is no
+   * usable remote or the URL cannot be parsed.
+   */
+  async function getCommitWebUrl(hash: string): Promise<string | null> {
+    if (!hash)
+      return null
+
+    const remotes = await getConfiguredRemotes().catch(() => [])
+    if (remotes.length === 0)
+      return null
+
+    const preferred = remotes.find(remote => remote.name === 'origin') ?? remotes[0]
+    const remoteUrl = preferred.refs.fetch || preferred.refs.push
+    return buildCommitWebUrl(remoteUrl, hash)
   }
 
   async function getRemoteParts(branch: GitBranchRef): Promise<{ remote: string, name: string }> {
@@ -815,6 +862,8 @@ export const useGitService = createSingletonComposable(() => {
     getHeadInfo,
     getLineHistory,
     getLineHistoryForHover,
+    getCommitWebUrl,
+    getFileChangeRefs,
     getGitRefs,
     fetchRemote,
     switchBranch,
