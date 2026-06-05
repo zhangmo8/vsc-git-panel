@@ -14,7 +14,7 @@ const { activate, deactivate } = defineExtension(() => {
   logger.info('Git Panel Activated')
 
   useGitPanelView()
-  const { tree } = useDiffTreeView()
+  const { panelTree, tree } = useDiffTreeView()
   useFileHistory()
 
   const gitChangeMonitor = useGitChangeMonitor()
@@ -25,6 +25,7 @@ const { activate, deactivate } = defineExtension(() => {
 
   useDisposable(new Disposable(() => {
     tree.dispose()
+    panelTree.dispose()
     gitChangeMonitor.dispose()
   }))
 })

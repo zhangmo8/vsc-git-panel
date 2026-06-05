@@ -1,5 +1,5 @@
 import type { TreeViewNode } from 'reactive-vscode'
-import { computed, createSingletonComposable, ref, useTreeView } from 'reactive-vscode'
+import { computed, createSingletonComposable, executeCommand, ref, useTreeView } from 'reactive-vscode'
 import { TreeItemCollapsibleState } from 'vscode'
 
 import { CommitNode } from './entity/CommitNode'
@@ -8,7 +8,7 @@ import { useFileTreeView } from './FileTreeView'
 import type { CommitDetails } from './types'
 
 import { useGitService } from '@/git'
-import { EXTENSION_SYMBOL } from '@/constant'
+import { CHANGES_VIEW_ID, PANEL_CHANGES_VIEW_ID } from '@/constant'
 import { logger } from '@/utils'
 
 interface StashViewState {
@@ -239,7 +239,15 @@ export const useDiffTreeView = createSingletonComposable(() => {
   })
 
   const tree = useTreeView(
-    `${EXTENSION_SYMBOL}.changes`,
+    CHANGES_VIEW_ID,
+    treeNodes,
+    {
+      showCollapseAll: true,
+    },
+  )
+
+  const panelTree = useTreeView(
+    PANEL_CHANGES_VIEW_ID,
     treeNodes,
     {
       showCollapseAll: true,
@@ -324,11 +332,22 @@ export const useDiffTreeView = createSingletonComposable(() => {
     refresh()
   }
 
+  async function focusChangesView() {
+    if (panelTree.visible) {
+      await executeCommand(`${PANEL_CHANGES_VIEW_ID}.focus`)
+      return
+    }
+
+    await executeCommand(`${CHANGES_VIEW_ID}.focus`)
+  }
+
   return {
     tree,
+    panelTree,
     selectedCommitHashes,
     refresh,
     refreshStash,
     clearSelection,
+    focusChangesView,
   }
 })

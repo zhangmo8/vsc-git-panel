@@ -36,6 +36,8 @@ export const CHANNEL = {
 export const EXTENSION_SYMBOL = 'git-panel'
 export const HISTORY_VIEW_ID = `${EXTENSION_SYMBOL}.historyView`
 export const CHANGES_VIEW_ID = `${EXTENSION_SYMBOL}.changes`
+export const PANEL_HISTORY_VIEW_ID = `${EXTENSION_SYMBOL}.panelHistoryView`
+export const PANEL_CHANGES_VIEW_ID = `${EXTENSION_SYMBOL}.panelChanges`
 
 export const GIT_STATUS = {
   MODIFIED: 'M',

@@ -35,13 +35,22 @@
   "activationEvents": [
     "onStartupFinished",
     "onView:git-panel.historyView",
-    "onView:git-panel.changes"
+    "onView:git-panel.changes",
+    "onView:git-panel.panelHistoryView",
+    "onView:git-panel.panelChanges"
   ],
   "contributes": {
     "viewsContainers": {
       "activitybar": [
         {
           "id": "git-panel",
+          "title": "Git Panel",
+          "icon": "$(git-commit)"
+        }
+      ],
+      "panel": [
+        {
+          "id": "git-panel-panel",
           "title": "Git Panel",
           "icon": "$(git-commit)"
         }
@@ -59,6 +68,23 @@
         },
         {
           "id": "git-panel.changes",
+          "name": "Git Changes",
+          "icon": "$(history)",
+          "contextualTitle": "Changes",
+          "visibility": "visible"
+        }
+      ],
+      "git-panel-panel": [
+        {
+          "type": "webview",
+          "id": "git-panel.panelHistoryView",
+          "name": "Git Panel",
+          "icon": "$(repo-forked)",
+          "contextualTitle": "History",
+          "visibility": "visible"
+        },
+        {
+          "id": "git-panel.panelChanges",
           "name": "Git Changes",
           "icon": "$(history)",
           "contextualTitle": "Changes",
@@ -138,27 +164,27 @@
       "view/title": [
         {
           "command": "git-panel.history.refresh",
-          "when": "view == git-panel.historyView",
+          "when": "view == git-panel.historyView || view == git-panel.panelHistoryView",
           "group": "navigation@4"
         },
         {
           "command": "git-panel.history.clear",
-          "when": "view == git-panel.historyView",
+          "when": "view == git-panel.historyView || view == git-panel.panelHistoryView",
           "group": "navigation@4"
         },
         {
           "command": "git-panel.showStats",
-          "when": "view == git-panel.historyView",
+          "when": "view == git-panel.historyView || view == git-panel.panelHistoryView",
           "group": "navigation@5"
         },
         {
           "command": "git-panel.goToCommit",
-          "when": "view == git-panel.historyView",
+          "when": "view == git-panel.historyView || view == git-panel.panelHistoryView",
           "group": "navigation@6"
         },
         {
           "command": "git-panel.backToHead",
-          "when": "view == git-panel.historyView",
+          "when": "view == git-panel.historyView || view == git-panel.panelHistoryView",
           "group": "navigation@7"
         }
       ],
@@ -184,7 +210,7 @@
       "view/item/context": [
         {
           "command": "git-panel.copyHash",
-          "when": "view == git-panel.changes && viewItem == git-commit",
+          "when": "(view == git-panel.changes || view == git-panel.panelChanges) && viewItem == git-commit",
           "group": "inline"
         }
       ]
