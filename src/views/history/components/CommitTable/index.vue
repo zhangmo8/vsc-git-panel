@@ -37,6 +37,7 @@ const lastScrolledHash = ref('')
 
 const isDragging = ref(false)
 const selectionStart = ref<number | null>(null)
+const selectionAnchorHash = ref<string | null>(null)
 const dragEndIndex = ref<number>(0)
 
 const columnWidths = ref<ColumnWidths>({ ...DEFAULT_COLUMN_WIDTHS })
@@ -335,34 +336,51 @@ const displayRows = computed(() => {
 //   return []
 // })
 
+function getRangeHashes(startIndex: number, endIndex: number) {
+  const startIdx = Math.min(startIndex, endIndex)
+  const endIdx = Math.max(startIndex, endIndex)
+
+  return commitData.value
+    .slice(startIdx, endIdx + 1)
+    .map(commit => commit.hash)
+}
+
+function getSelectionAnchorIndex(fallbackIndex: number) {
+  const selectedHashes = selectedCommitHashes.value
+  const anchorHash = selectionAnchorHash.value
+  const rangeAnchorHash = anchorHash && selectedHashes.includes(anchorHash)
+    ? anchorHash
+    : selectedHashes[selectedHashes.length - 1]
+
+  if (!rangeAnchorHash)
+    return fallbackIndex
+
+  const anchorIndex = commitData.value.findIndex(commit => commit.hash === rangeAnchorHash)
+  return anchorIndex === -1 ? fallbackIndex : anchorIndex
+}
+
 function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
   isDragging.value = true
 
-  if (event.shiftKey && selectedCommitHashes.value.length > 0) {
-    const lastSelectedIndex = commitData.value.findIndex(
-      commit => commit.hash === selectedCommitHashes.value[selectedCommitHashes.value.length - 1],
-    )
-    if (lastSelectedIndex !== -1) {
-      const startIdx = Math.min(lastSelectedIndex, index)
-      const endIdx = Math.max(lastSelectedIndex, index)
-      const hashesToSelect = commitData.value
-        .slice(startIdx, endIdx + 1)
-        .map(commit => commit.hash)
-
-      // Add all hashes in range without duplicates
-      selectedCommitHashes.value = [...new Set([...selectedCommitHashes.value, ...hashesToSelect])]
-    }
+  if (event.shiftKey) {
+    const anchorIndex = getSelectionAnchorIndex(index)
+    selectionAnchorHash.value = commitData.value[anchorIndex]?.hash ?? hash
+    selectedCommitHashes.value = getRangeHashes(anchorIndex, index)
   }
   else if (event.ctrlKey || event.metaKey) {
     if (selectedCommitHashes.value.includes(hash)) {
-      selectedCommitHashes.value = selectedCommitHashes.value.filter(h => h !== hash)
+      const nextSelectedHashes = selectedCommitHashes.value.filter(h => h !== hash)
+      selectedCommitHashes.value = nextSelectedHashes
+      selectionAnchorHash.value = nextSelectedHashes[nextSelectedHashes.length - 1] ?? null
     }
     else {
-      selectedCommitHashes.value.push(hash)
+      selectedCommitHashes.value = [...selectedCommitHashes.value, hash]
+      selectionAnchorHash.value = hash
     }
   }
   else {
     selectedCommitHashes.value = [hash]
+    selectionAnchorHash.value = hash
   }
 
   handleMouseUp()
@@ -374,23 +392,23 @@ function handleMouseDown(index: number, event: MouseEvent) {
     return
   }
 
+  const commit = commitData.value[index]
+  if (!commit)
+    return
+
   if (!event.ctrlKey && !event.metaKey && !event.shiftKey) {
     isDragging.value = true
     selectionStart.value = index
+    selectionAnchorHash.value = commit.hash
     dragEndIndex.value = index
-    selectedCommitHashes.value = [commitData.value[index].hash]
+    selectedCommitHashes.value = [commit.hash]
   }
 }
 
 function handleMouseOver(index: number) {
   if (isDragging.value && selectionStart.value !== null) {
-    const startIdx = Math.min(selectionStart.value, index)
-    const endIdx = Math.max(selectionStart.value, index)
-    const hashesToSelect = commitData.value
-      .slice(startIdx, endIdx + 1)
-      .map(commit => commit.hash)
-
-    selectedCommitHashes.value = hashesToSelect
+    dragEndIndex.value = index
+    selectedCommitHashes.value = getRangeHashes(selectionStart.value, index)
   }
 }
 
