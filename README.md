@@ -1,6 +1,8 @@
+
+
 # VSC Git Panel
 
-  Inspect by [Git History](https://marketplace.visualstudio.com/items?itemName=GuodongSun.vscode-git-cruise).
+  Inspired by [Git History](https://marketplace.visualstudio.com/items?itemName=GuodongSun.vscode-git-cruise).
 
   A Git viewing tool for the brief introduction version for VS Code.
 
