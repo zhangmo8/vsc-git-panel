@@ -6,6 +6,7 @@ import Empty from './components/Empty.vue'
 import FilterSelect from './components/FilterSelect.vue'
 import RefPanel from './components/Refs/RefPanel.vue'
 import StashItem from './components/StashItem.vue'
+import WorktreePanel from './components/Worktree/WorktreePanel.vue'
 import { DEFAULT_COLUMN_VISIBILITY } from './components/CommitTable/columns'
 
 import { getVscodeApi } from './utils'
@@ -14,7 +15,7 @@ import type { ColumnVisibility } from './components/CommitTable/columns'
 
 import { CHANNEL, WEBVIEW_CHANNEL } from '@/constant'
 
-import type { Commit, CommitGraph, GitBranchAction, GitBranchRef, GitHistoryFilter, GitLineHistory, GitOperation, GitRefsSummary, StashEntry } from '@/git'
+import type { Commit, CommitGraph, GitBranchAction, GitBranchRef, GitHistoryFilter, GitLineHistory, GitOperation, GitRefsSummary, GitWorktree, GitWorktreeAction, StashEntry } from '@/git'
 
 declare global {
   interface Window {
@@ -57,7 +58,7 @@ let latestHistoryRequestId = 0
 let suppressFilterWatch = false
 
 // ---------------- Stash 面板 ----------------
-type TabKey = 'history' | 'stash' | 'branches' | 'remotes'
+type TabKey = 'history' | 'stash' | 'branches' | 'remotes' | 'worktrees'
 const activeTab = ref<TabKey>('history')
 const stashes = ref<StashEntry[]>([])
 const isStashLoading = ref<boolean>(false)
@@ -67,6 +68,135 @@ const gitRefs = ref<GitRefsSummary>({ branches: [], remotes: [] })
 const isRefsLoading = ref<boolean>(false)
 const refsSearch = ref<string>('')
 const fetchingRemote = ref<string>('')
+const worktrees = ref<GitWorktree[]>([])
+const isWorktreesLoading = ref<boolean>(false)
+const worktreeSearch = ref<string>('')
+
+// ---------------- Tab 顺序（可拖拽排序，持久化） ----------------
+interface TabMeta {
+  key: TabKey
+  label: string
+  icon: string
+}
+
+const TAB_META: Record<TabKey, TabMeta> = {
+  history: {
+    key: 'history',
+    label: 'History',
+    icon: 'M7.99909 3C10.7605 3 12.9991 5.23858 12.9991 8C12.9991 10.7614 10.7605 13 7.99909 13C5.39117 13 3.2491 11.003 3.0195 8.45512C2.99471 8.1801 2.75167 7.97723 2.47664 8.00202C2.20161 8.0268 1.99875 8.26985 2.02353 8.54488C2.29916 11.6035 4.86898 14 7.99909 14C11.3128 14 13.9991 11.3137 13.9991 8C13.9991 4.68629 11.3128 2 7.99909 2C6.20656 2 4.59815 2.78613 3.49909 4.03138V2.5C3.49909 2.22386 3.27524 2 2.99909 2C2.72295 2 2.49909 2.22386 2.49909 2.5V5.5C2.49909 5.77614 2.72295 6 2.99909 6H3.08812C3.09498 6.00014 3.10184 6.00014 3.10868 6H5.99909C6.27524 6 6.49909 5.77614 6.49909 5.5C6.49909 5.22386 6.27524 5 5.99909 5H3.99863C4.91128 3.78495 6.36382 3 7.99909 3ZM7.99909 5.5C7.99909 5.22386 7.77524 5 7.49909 5C7.22295 5 6.99909 5.22386 6.99909 5.5V8.5C6.99909 8.77614 7.22295 9 7.49909 9H9.49909C9.77524 9 9.99909 8.77614 9.99909 8.5C9.99909 8.22386 9.77524 8 9.49909 8H7.99909V5.5Z',
+  },
+  stash: {
+    key: 'stash',
+    label: 'Stash',
+    icon: 'M6.5 8C6.22386 8 6 8.22386 6 8.5C6 8.77614 6.22386 9 6.5 9H9.5C9.77614 9 10 8.77614 10 8.5C10 8.22386 9.77614 8 9.5 8H6.5ZM1 3.5C1 2.67157 1.67157 2 2.5 2H13.5C14.3284 2 15 2.67157 15 3.5V4.5C15 5.15311 14.5826 5.70873 14 5.91465V11.5C14 12.8807 12.8807 14 11.5 14H4.5C3.11929 14 2 12.8807 2 11.5V5.91465C1.4174 5.70873 1 5.15311 1 4.5V3.5ZM2.5 3C2.22386 3 2 3.22386 2 3.5V4.5C2 4.77614 2.22386 5 2.5 5H13.5C13.7761 5 14 4.77614 14 4.5V3.5C14 3.22386 13.7761 3 13.5 3H2.5ZM3 6V11.5C3 12.3284 3.67157 13 4.5 13H11.5C12.3284 13 13 12.3284 13 11.5V6H3Z',
+  },
+  branches: {
+    key: 'branches',
+    label: 'Branches',
+    icon: 'M14 5.5C14 4.121 12.879 3 11.5 3C10.121 3 9 4.121 9 5.5C9 6.682 9.826 7.669 10.93 7.928C10.744 8.546 10.177 9 9.5 9H6.5C5.935 9 5.419 9.195 5 9.512V4.949C6.14 4.717 7 3.707 7 2.5C7 1.121 5.879 0 4.5 0C3.121 0 2 1.121 2 2.5C2 3.708 2.86 4.717 4 4.949V11.05C2.86 11.282 2 12.292 2 13.499C2 14.878 3.121 15.999 4.5 15.999C5.879 15.999 7 14.878 7 13.499C7 12.317 6.174 11.33 5.07 11.071C5.256 10.453 5.823 9.999 6.5 9.999H9.5C10.723 9.999 11.74 9.115 11.954 7.953C13.116 7.738 14 6.723 14 5.5ZM3 2.5C3 1.673 3.673 1 4.5 1C5.327 1 6 1.673 6 2.5C6 3.327 5.327 4 4.5 4C3.673 4 3 3.327 3 2.5ZM6 13.5C6 14.327 5.327 15 4.5 15C3.673 15 3 14.327 3 13.5C3 12.673 3.673 12 4.5 12C5.327 12 6 12.673 6 13.5ZM11.5 7C10.673 7 10 6.327 10 5.5C10 4.673 10.673 4 11.5 4C12.327 4 13 4.673 13 5.5C13 6.327 12.327 7 11.5 7Z',
+  },
+  remotes: {
+    key: 'remotes',
+    label: 'Remotes',
+    icon: 'M1.75 2C0.784 2 0 2.784 0 3.75V11.25C0 12.216 0.784 13 1.75 13H14.25C15.216 13 16 12.216 16 11.25V3.75C16 2.784 15.216 2 14.25 2H1.75ZM1 3.75C1 3.336 1.336 3 1.75 3H14.25C14.664 3 15 3.336 15 3.75V11.25C15 11.664 14.664 12 14.25 12H1.75C1.336 12 1 11.664 1 11.25V3.75ZM3 5.5C3 5.224 3.224 5 3.5 5H12.5C12.776 5 13 5.224 13 5.5C13 5.776 12.776 6 12.5 6H3.5C3.224 6 3 5.776 3 5.5ZM3 8.5C3 8.224 3.224 8 3.5 8H9.5C9.776 8 10 8.224 10 8.5C10 8.776 9.776 9 9.5 9H3.5C3.224 9 3 8.776 3 8.5Z',
+  },
+  worktrees: {
+    key: 'worktrees',
+    label: 'Worktrees',
+    icon: 'M14.5 2h-13C.67 2 0 2.67 0 3.5v9c0 .83.67 1.5 1.5 1.5h13c.83 0 1.5-.67 1.5-1.5v-9c0-.83-.67-1.5-1.5-1.5zM15 12.5c0 .28-.22.5-.5.5h-13c-.28 0-.5-.22-.5-.5v-9c0-.28.22-.5.5-.5h13c.28 0 .5.22.5.5v9zM3.5 5h9v1h-9V5zm0 3h6v1h-6V8z',
+  },
+}
+
+const DEFAULT_TAB_ORDER: TabKey[] = ['history', 'stash', 'branches', 'remotes', 'worktrees']
+const TAB_ORDER_STORAGE_KEY = 'git-panel.tabOrder'
+
+function loadTabOrder(): TabKey[] {
+  try {
+    const raw = localStorage.getItem(TAB_ORDER_STORAGE_KEY)
+    if (!raw)
+      return [...DEFAULT_TAB_ORDER]
+    const parsed = JSON.parse(raw) as unknown
+    if (!Array.isArray(parsed))
+      return [...DEFAULT_TAB_ORDER]
+    const valid = parsed.filter((key): key is TabKey => DEFAULT_TAB_ORDER.includes(key as TabKey))
+    // 补全缺失的新增 Tab，防止版本升级后丢失
+    for (const key of DEFAULT_TAB_ORDER) {
+      if (!valid.includes(key))
+        valid.push(key)
+    }
+    return valid
+  }
+  catch {
+    return [...DEFAULT_TAB_ORDER]
+  }
+}
+
+const tabOrder = ref<TabKey[]>(loadTabOrder())
+const orderedTabs = computed(() => tabOrder.value.map(key => TAB_META[key]))
+
+function tabBadge(key: TabKey): number {
+  switch (key) {
+    case 'stash':
+      return stashes.value.length
+    case 'branches':
+      return gitRefs.value.branches.length
+    case 'remotes':
+      return gitRefs.value.remotes.length
+    case 'worktrees':
+      return worktrees.value.length
+    default:
+      return 0
+  }
+}
+
+const draggingTab = ref<TabKey | null>(null)
+const dragOverTab = ref<TabKey | null>(null)
+
+function onTabDragStart(key: TabKey, event: DragEvent) {
+  draggingTab.value = key
+  if (event.dataTransfer) {
+    event.dataTransfer.effectAllowed = 'move'
+    // Firefox 需要 setData 才会触发拖拽
+    event.dataTransfer.setData('text/plain', key)
+  }
+}
+
+function onTabDragOver(key: TabKey, event: DragEvent) {
+  if (!draggingTab.value || draggingTab.value === key)
+    return
+  event.preventDefault()
+  if (event.dataTransfer)
+    event.dataTransfer.dropEffect = 'move'
+  dragOverTab.value = key
+}
+
+function onTabDrop(targetKey: TabKey, event: DragEvent) {
+  event.preventDefault()
+  const from = draggingTab.value
+  dragOverTab.value = null
+  draggingTab.value = null
+  if (!from || from === targetKey)
+    return
+  const next = [...tabOrder.value]
+  const fromIndex = next.indexOf(from)
+  const targetIndex = next.indexOf(targetKey)
+  if (fromIndex === -1 || targetIndex === -1)
+    return
+  next.splice(fromIndex, 1)
+  next.splice(targetIndex, 0, from)
+  tabOrder.value = next
+  try {
+    localStorage.setItem(TAB_ORDER_STORAGE_KEY, JSON.stringify(next))
+  }
+  catch {
+    // 持久化失败不影响当前会话排序
+  }
+}
+
+function onTabDragEnd() {
+  draggingTab.value = null
+  dragOverTab.value = null
+}
 
 const filteredStashes = computed(() => {
   const keyword = stashSearch.value.trim().toLowerCase()
@@ -94,6 +224,38 @@ function loadStashList() {
 function loadGitRefs() {
   isRefsLoading.value = true
   vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_GIT_REFS })
+}
+
+function loadWorktrees() {
+  isWorktreesLoading.value = true
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.GET_WORKTREES })
+}
+
+function addWorktree() {
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.ADD_WORKTREE })
+}
+
+function toPlainWorktree(worktree: GitWorktree): GitWorktree {
+  const raw = toRaw(worktree)
+  return {
+    path: raw.path,
+    branch: raw.branch,
+    fullBranch: raw.fullBranch,
+    head: raw.head,
+    shortHead: raw.shortHead,
+    isMain: raw.isMain,
+    isCurrent: raw.isCurrent,
+    detached: raw.detached,
+    locked: raw.locked,
+    lockReason: raw.lockReason,
+    prunable: raw.prunable,
+    prunableReason: raw.prunableReason,
+    bare: raw.bare,
+  }
+}
+
+function runWorktreeAction(action: GitWorktreeAction, worktree: GitWorktree) {
+  vscode.postMessage({ command: WEBVIEW_CHANNEL.RUN_WORKTREE_ACTION, action, worktree: toPlainWorktree(worktree) })
 }
 
 function fetchRemote(remoteName: string) {
@@ -169,6 +331,9 @@ function switchTab(tab: TabKey) {
   }
   else if (tab === 'branches' || tab === 'remotes') {
     loadGitRefs()
+  }
+  else if (tab === 'worktrees') {
+    loadWorktrees()
   }
 }
 
@@ -391,6 +556,10 @@ window.addEventListener('message', (event: { data: any }) => {
       isRefsLoading.value = false
       fetchingRemote.value = ''
       break
+    case CHANNEL.WORKTREES:
+      worktrees.value = (message.worktrees as GitWorktree[]) || []
+      isWorktreesLoading.value = false
+      break
     case CHANNEL.ERROR:
       if (typeof message.requestId === 'number' && message.requestId !== latestHistoryRequestId) {
         break
@@ -404,6 +573,7 @@ window.addEventListener('message', (event: { data: any }) => {
       isStashLoading.value = false
       isRefsLoading.value = false
       fetchingRemote.value = ''
+      isWorktreesLoading.value = false
       break
   }
 })
@@ -480,47 +650,26 @@ const hasSearchFilter = computed(() => {
     <!-- 顶部 Tab 切换 -->
     <div class="tabs">
       <button
+        v-for="tab in orderedTabs"
+        :key="tab.key"
         class="tab"
-        :class="{ active: activeTab === 'history' }"
-        @click="switchTab('history')"
+        :class="{
+          'active': activeTab === tab.key,
+          'dragging': draggingTab === tab.key,
+          'drag-over': dragOverTab === tab.key,
+        }"
+        draggable="true"
+        @click="switchTab(tab.key)"
+        @dragstart="onTabDragStart(tab.key, $event)"
+        @dragover="onTabDragOver(tab.key, $event)"
+        @drop="onTabDrop(tab.key, $event)"
+        @dragend="onTabDragEnd"
       >
         <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <path d="M7.99909 3C10.7605 3 12.9991 5.23858 12.9991 8C12.9991 10.7614 10.7605 13 7.99909 13C5.39117 13 3.2491 11.003 3.0195 8.45512C2.99471 8.1801 2.75167 7.97723 2.47664 8.00202C2.20161 8.0268 1.99875 8.26985 2.02353 8.54488C2.29916 11.6035 4.86898 14 7.99909 14C11.3128 14 13.9991 11.3137 13.9991 8C13.9991 4.68629 11.3128 2 7.99909 2C6.20656 2 4.59815 2.78613 3.49909 4.03138V2.5C3.49909 2.22386 3.27524 2 2.99909 2C2.72295 2 2.49909 2.22386 2.49909 2.5V5.5C2.49909 5.77614 2.72295 6 2.99909 6H3.08812C3.09498 6.00014 3.10184 6.00014 3.10868 6H5.99909C6.27524 6 6.49909 5.77614 6.49909 5.5C6.49909 5.22386 6.27524 5 5.99909 5H3.99863C4.91128 3.78495 6.36382 3 7.99909 3ZM7.99909 5.5C7.99909 5.22386 7.77524 5 7.49909 5C7.22295 5 6.99909 5.22386 6.99909 5.5V8.5C6.99909 8.77614 7.22295 9 7.49909 9H9.49909C9.77524 9 9.99909 8.77614 9.99909 8.5C9.99909 8.22386 9.77524 8 9.49909 8H7.99909V5.5Z" />
+          <path :d="tab.icon" />
         </svg>
-        <span>History</span>
-      </button>
-      <button
-        class="tab"
-        :class="{ active: activeTab === 'stash' }"
-        @click="switchTab('stash')"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <path d="M6.5 8C6.22386 8 6 8.22386 6 8.5C6 8.77614 6.22386 9 6.5 9H9.5C9.77614 9 10 8.77614 10 8.5C10 8.22386 9.77614 8 9.5 8H6.5ZM1 3.5C1 2.67157 1.67157 2 2.5 2H13.5C14.3284 2 15 2.67157 15 3.5V4.5C15 5.15311 14.5826 5.70873 14 5.91465V11.5C14 12.8807 12.8807 14 11.5 14H4.5C3.11929 14 2 12.8807 2 11.5V5.91465C1.4174 5.70873 1 5.15311 1 4.5V3.5ZM2.5 3C2.22386 3 2 3.22386 2 3.5V4.5C2 4.77614 2.22386 5 2.5 5H13.5C13.7761 5 14 4.77614 14 4.5V3.5C14 3.22386 13.7761 3 13.5 3H2.5ZM3 6V11.5C3 12.3284 3.67157 13 4.5 13H11.5C12.3284 13 13 12.3284 13 11.5V6H3Z" />
-        </svg>
-        <span>Stash</span>
-        <span v-if="stashes.length > 0" class="tab-badge">{{ stashes.length }}</span>
-      </button>
-      <button
-        class="tab"
-        :class="{ active: activeTab === 'branches' }"
-        @click="switchTab('branches')"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <path d="M14 5.5C14 4.121 12.879 3 11.5 3C10.121 3 9 4.121 9 5.5C9 6.682 9.826 7.669 10.93 7.928C10.744 8.546 10.177 9 9.5 9H6.5C5.935 9 5.419 9.195 5 9.512V4.949C6.14 4.717 7 3.707 7 2.5C7 1.121 5.879 0 4.5 0C3.121 0 2 1.121 2 2.5C2 3.708 2.86 4.717 4 4.949V11.05C2.86 11.282 2 12.292 2 13.499C2 14.878 3.121 15.999 4.5 15.999C5.879 15.999 7 14.878 7 13.499C7 12.317 6.174 11.33 5.07 11.071C5.256 10.453 5.823 9.999 6.5 9.999H9.5C10.723 9.999 11.74 9.115 11.954 7.953C13.116 7.738 14 6.723 14 5.5ZM3 2.5C3 1.673 3.673 1 4.5 1C5.327 1 6 1.673 6 2.5C6 3.327 5.327 4 4.5 4C3.673 4 3 3.327 3 2.5ZM6 13.5C6 14.327 5.327 15 4.5 15C3.673 15 3 14.327 3 13.5C3 12.673 3.673 12 4.5 12C5.327 12 6 12.673 6 13.5ZM11.5 7C10.673 7 10 6.327 10 5.5C10 4.673 10.673 4 11.5 4C12.327 4 13 4.673 13 5.5C13 6.327 12.327 7 11.5 7Z" />
-        </svg>
-        <span>Branches</span>
-        <span v-if="gitRefs.branches.length > 0" class="tab-badge">{{ gitRefs.branches.length }}</span>
-      </button>
-      <button
-        class="tab"
-        :class="{ active: activeTab === 'remotes' }"
-        @click="switchTab('remotes')"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-          <path d="M1.75 2C0.784 2 0 2.784 0 3.75V11.25C0 12.216 0.784 13 1.75 13H14.25C15.216 13 16 12.216 16 11.25V3.75C16 2.784 15.216 2 14.25 2H1.75ZM1 3.75C1 3.336 1.336 3 1.75 3H14.25C14.664 3 15 3.336 15 3.75V11.25C15 11.664 14.664 12 14.25 12H1.75C1.336 12 1 11.664 1 11.25V3.75ZM3 5.5C3 5.224 3.224 5 3.5 5H12.5C12.776 5 13 5.224 13 5.5C13 5.776 12.776 6 12.5 6H3.5C3.224 6 3 5.776 3 5.5ZM3 8.5C3 8.224 3.224 8 3.5 8H9.5C9.776 8 10 8.224 10 8.5C10 8.776 9.776 9 9.5 9H3.5C3.224 9 3 8.776 3 8.5Z" />
-        </svg>
-        <span>Remotes</span>
-        <span v-if="gitRefs.remotes.length > 0" class="tab-badge">{{ gitRefs.remotes.length }}</span>
+        <span>{{ tab.label }}</span>
+        <span v-if="tabBadge(tab.key) > 0" class="tab-badge">{{ tabBadge(tab.key) }}</span>
       </button>
     </div>
 
@@ -789,7 +938,7 @@ const hasSearchFilter = computed(() => {
     </template>
 
     <!-- ============ Remotes Tab ============ -->
-    <template v-else>
+    <template v-else-if="activeTab === 'remotes'">
       <RefPanel
         v-model:search="refsSearch"
         mode="remotes"
@@ -800,6 +949,18 @@ const hasSearchFilter = computed(() => {
         @refresh="loadGitRefs"
         @fetch-remote="fetchRemote"
         @branch-action="runBranchAction"
+      />
+    </template>
+
+    <!-- ============ Worktrees Tab ============ -->
+    <template v-else>
+      <WorktreePanel
+        v-model:search="worktreeSearch"
+        :worktrees="worktrees"
+        :loading="isWorktreesLoading"
+        @refresh="loadWorktrees"
+        @add="addWorktree"
+        @worktree-action="runWorktreeAction"
       />
     </template>
 
@@ -1038,6 +1199,20 @@ const hasSearchFilter = computed(() => {
 .tab.active {
   color: var(--vscode-foreground);
   border-bottom-color: var(--vscode-focusBorder, #0075ca);
+}
+
+.tab[draggable='true'] {
+  cursor: grab;
+}
+
+.tab.dragging {
+  opacity: 0.5;
+  cursor: grabbing;
+}
+
+.tab.drag-over {
+  background-color: var(--vscode-list-dropBackground, rgba(0, 117, 202, 0.16));
+  box-shadow: inset 2px 0 0 var(--vscode-focusBorder, #0075ca);
 }
 
 .tab-badge {

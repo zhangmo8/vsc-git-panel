@@ -1,5 +1,6 @@
+import path from 'node:path'
 import type { Webview } from 'vscode'
-import { ExtensionMode, Uri, window } from 'vscode'
+import { ExtensionMode, Uri, env, window } from 'vscode'
 import {
   computed,
   extensionContext as context,
@@ -16,7 +17,7 @@ import { useGitService } from '@/git'
 import { CHANNEL, HISTORY_VIEW_ID, PANEL_HISTORY_VIEW_ID, WEBVIEW_CHANNEL } from '@/constant'
 import { formatError, logger } from '@/utils'
 
-import type { CommitGraph, GitBranchAction, GitBranchRef, GitHeadInfo, GitHistoryFilter } from '@/git'
+import type { CommitGraph, GitBranchAction, GitBranchRef, GitHeadInfo, GitHistoryFilter, GitWorktree, GitWorktreeAction } from '@/git'
 
 interface HistoryMessage {
   command: typeof WEBVIEW_CHANNEL.GET_HISTORY
@@ -59,6 +60,9 @@ type WebviewMessage =
   | { command: typeof WEBVIEW_CHANNEL.DROP_STASH, ref: string }
   | { command: typeof WEBVIEW_CHANNEL.CLEAR_STASH }
   | { command: typeof WEBVIEW_CHANNEL.SHOW_STASH_DIFF, ref: string }
+  | { command: typeof WEBVIEW_CHANNEL.GET_WORKTREES }
+  | { command: typeof WEBVIEW_CHANNEL.RUN_WORKTREE_ACTION, action: GitWorktreeAction, worktree: GitWorktree }
+  | { command: typeof WEBVIEW_CHANNEL.ADD_WORKTREE }
   | StashDetailsMessage
 
 function parseCommitHashes(rawHashes: string): string[] {
@@ -293,6 +297,18 @@ export const useGitPanelView = createSingletonComposable(() => {
 
       case WEBVIEW_CHANNEL.SHOW_STASH_DIFF:
         await showStashDiff(message.ref)
+        break
+
+      case WEBVIEW_CHANNEL.GET_WORKTREES:
+        await refreshWorktrees()
+        break
+
+      case WEBVIEW_CHANNEL.RUN_WORKTREE_ACTION:
+        await handleWorktreeAction(message.action, message.worktree)
+        break
+
+      case WEBVIEW_CHANNEL.ADD_WORKTREE:
+        await handleAddWorktree()
         break
 
       case WEBVIEW_CHANNEL.SHOW_STASH_DETAILS:
@@ -718,6 +734,259 @@ export const useGitPanelView = createSingletonComposable(() => {
     }
   }
 
+  async function refreshWorktrees() {
+    try {
+      const { worktrees, mainBranch } = await git.getWorktrees()
+      postMessage({
+        command: CHANNEL.WORKTREES,
+        worktrees,
+        mainBranch,
+      })
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to get worktrees:', error)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to load worktrees: ${errorMessage}`,
+      })
+    }
+  }
+
+  async function handleWorktreeAction(action: GitWorktreeAction, worktree: GitWorktree) {
+    try {
+      switch (action) {
+        case 'open':
+          await executeCommand('vscode.openFolder', Uri.file(worktree.path), { forceNewWindow: false })
+          return
+
+        case 'openNewWindow':
+          await executeCommand('vscode.openFolder', Uri.file(worktree.path), { forceNewWindow: true })
+          return
+
+        case 'reveal':
+          await executeCommand('revealFileInOS', Uri.file(worktree.path))
+          return
+
+        case 'copyPath':
+          await env.clipboard.writeText(worktree.path)
+          window.showInformationMessage(`Copied path: ${worktree.path}`)
+          return
+
+        case 'lock': {
+          const reason = await window.showInputBox({
+            title: `Lock ${worktree.branch || worktree.path}`,
+            prompt: 'Optional lock reason',
+            ignoreFocusOut: true,
+          })
+          // 用户取消输入框（Escape）-> 中止。
+          if (reason === undefined)
+            return
+          await git.lockWorktree(worktree.path, reason.trim() || undefined)
+          window.showInformationMessage(`Locked ${worktree.branch || worktree.path}`)
+          break
+        }
+
+        case 'unlock':
+          await git.unlockWorktree(worktree.path)
+          window.showInformationMessage(`Unlocked ${worktree.branch || worktree.path}`)
+          break
+
+        case 'remove': {
+          if (worktree.isMain)
+            throw new Error('Cannot remove the main working tree')
+          if (worktree.isCurrent)
+            throw new Error('Cannot remove the worktree that is currently open')
+
+          const confirm = await window.showWarningMessage(
+            `Remove worktree at "${worktree.path}"? This deletes its working directory.`,
+            { modal: true },
+            'Remove',
+          )
+          if (confirm !== 'Remove')
+            return
+
+          try {
+            await git.removeWorktree(worktree.path, false)
+          }
+          catch (error) {
+            // worktree 有改动或被锁定 -> 提供强制删除。
+            const message = formatError(error)
+            const force = await window.showWarningMessage(
+              `Could not remove worktree: ${message} Force remove anyway?`,
+              { modal: true },
+              'Force Remove',
+            )
+            if (force !== 'Force Remove')
+              return
+            await git.removeWorktree(worktree.path, true)
+          }
+          window.showInformationMessage(`Removed worktree at ${worktree.path}`)
+          break
+        }
+
+        case 'merge': {
+          if (worktree.isMain)
+            throw new Error('Cannot merge the main working tree into itself')
+          if (!worktree.branch || worktree.detached)
+            throw new Error('This worktree has no branch to merge')
+
+          const { mainBranch } = await git.getWorktrees()
+          const target = mainBranch ? `"${mainBranch}"` : 'the main working tree'
+          const confirm = await window.showWarningMessage(
+            `Merge "${worktree.branch}" into ${target}?`,
+            { modal: true },
+            'Merge',
+          )
+          if (confirm !== 'Merge')
+            return
+
+          await git.mergeWorktreeBranch(worktree.path)
+          window.showInformationMessage(`Merged ${worktree.branch} into ${mainBranch || 'the main working tree'}`)
+          await refreshHistory(true)
+          break
+        }
+      }
+
+      await refreshWorktrees()
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error(`Failed to ${action} worktree:`, error)
+      const looksLikeConflict = /conflict|merge/i.test(errorMessage)
+      const hint = looksLikeConflict
+        ? ' Resolve conflicts in the main working tree via Source Control.'
+        : ''
+      window.showErrorMessage(`Failed to ${action} worktree: ${errorMessage}${hint}`)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to ${action} worktree: ${errorMessage}`,
+      })
+      await refreshWorktrees()
+    }
+  }
+
+  async function handleAddWorktree() {
+    try {
+      const refs = await git.getGitRefs()
+      const CREATE_NEW = '$__create_new__'
+
+      const branchPicks = refs.branches.map(branch => ({
+        label: branch.name,
+        description: branch.type === 'remote' ? 'remote' : (branch.current ? 'current' : 'local'),
+        value: branch.name,
+        isRemote: branch.type === 'remote',
+        remote: branch.remote,
+      }))
+
+      const picked = await window.showQuickPick(
+        [
+          { label: '$(add) Create a new branch', description: 'Branch off an existing ref', value: CREATE_NEW, isRemote: false, remote: undefined },
+          ...branchPicks,
+        ],
+        {
+          title: 'Add Worktree — base ref',
+          placeHolder: 'Select a branch to check out, or create a new branch',
+          ignoreFocusOut: true,
+        },
+      )
+      if (!picked)
+        return
+
+      let ref: string | undefined
+      let newBranch: string | undefined
+
+      if (picked.value === CREATE_NEW) {
+        const name = await window.showInputBox({
+          title: 'Add Worktree — new branch name',
+          prompt: 'Name of the new branch',
+          ignoreFocusOut: true,
+          validateInput: value => (value.trim() ? undefined : 'Branch name is required'),
+        })
+        if (!name)
+          return
+        newBranch = name.trim()
+
+        const base = await window.showInputBox({
+          title: 'Add Worktree — base ref',
+          prompt: 'Base ref for the new branch (leave empty for current HEAD)',
+          ignoreFocusOut: true,
+        })
+        if (base === undefined)
+          return
+        ref = base.trim() || undefined
+      }
+      else if (picked.isRemote) {
+        // 直接检出 remote 分支会变成 detached HEAD，改为建立本地跟踪分支（去掉 remote 前缀）。
+        const prefix = picked.remote ? `${picked.remote}/` : ''
+        const localName = prefix && picked.value.startsWith(prefix)
+          ? picked.value.slice(prefix.length)
+          : picked.value
+        newBranch = localName
+        ref = picked.value
+      }
+      else {
+        ref = picked.value
+      }
+
+      const defaultSuffix = (newBranch || ref || 'worktree').replace(/[\\/]/g, '-')
+
+      // 让用户选择存放新 worktree 的父目录，默认定位到仓库父目录，方便 ../<branch> 同级布局。
+      const parentPick = await window.showOpenDialog({
+        title: 'Add Worktree — choose parent directory',
+        openLabel: 'Select Parent Folder',
+        canSelectFiles: false,
+        canSelectFolders: true,
+        canSelectMany: false,
+        defaultUri: Uri.file(path.dirname(git.rootRepoPath)),
+      })
+      if (!parentPick || parentPick.length === 0)
+        return
+
+      const parentDir = parentPick[0].fsPath
+
+      // 让用户确认/调整父目录下的文件夹名。
+      const folderName = await window.showInputBox({
+        title: 'Add Worktree — folder name',
+        prompt: `New worktree directory name under ${parentDir}`,
+        value: defaultSuffix,
+        ignoreFocusOut: true,
+        validateInput: value => (value.trim() ? undefined : 'A folder name is required'),
+      })
+      if (!folderName)
+        return
+
+      const absolutePath = path.join(parentDir, folderName.trim())
+
+      await git.addWorktree({
+        path: absolutePath,
+        ref,
+        newBranch,
+      })
+
+      await refreshWorktrees()
+
+      const open = await window.showInformationMessage(
+        `Created worktree${newBranch ? ` for ${newBranch}` : ''}. Open it?`,
+        'Open',
+        'Open in New Window',
+      )
+      if (open === 'Open')
+        await executeCommand('vscode.openFolder', Uri.file(absolutePath), { forceNewWindow: false })
+      else if (open === 'Open in New Window')
+        await executeCommand('vscode.openFolder', Uri.file(absolutePath), { forceNewWindow: true })
+    }
+    catch (error) {
+      const errorMessage = formatError(error)
+      logger.error('Failed to add worktree:', error)
+      window.showErrorMessage(`Failed to add worktree: ${errorMessage}`)
+      postMessage({
+        command: CHANNEL.ERROR,
+        message: `Failed to add worktree: ${errorMessage}`,
+      })
+    }
+  }
+
   return {
     viewType: HISTORY_VIEW_ID,
     refreshHistory,
@@ -736,5 +1005,6 @@ export const useGitPanelView = createSingletonComposable(() => {
     refreshStashList,
     refreshGitRefs,
     fetchRemote,
+    refreshWorktrees,
   }
 })

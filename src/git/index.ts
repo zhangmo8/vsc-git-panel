@@ -1,8 +1,9 @@
+import { realpathSync } from 'node:fs'
 import simpleGit from 'simple-git'
 import { createSingletonComposable, useWorkspaceFolders } from 'reactive-vscode'
 
 import type { SimpleGit } from 'simple-git'
-import type { Commit, CommitFile, CommitGraph, ExtendedLogResult, GitBranchRef, GitHeadInfo, GitHistoryFilter, GitRefsSummary, GitRemoteRef, StashEntry } from './types'
+import type { AddWorktreeOptions, Commit, CommitFile, CommitGraph, ExtendedLogResult, GitBranchRef, GitHeadInfo, GitHistoryFilter, GitRefsSummary, GitRemoteRef, GitWorktree, GitWorktreeSummary, StashEntry } from './types'
 import {
   buildHistoryLogArgs,
   buildOperations,
@@ -12,6 +13,7 @@ import {
   parseRawGitLog,
 } from './historyUtils'
 import { parseGitBlameLine, parseGitDiffPreviousLine } from './lineHistoryUtils'
+import { getMainWorktreeBranch, parseWorktreeList } from './worktreeUtils'
 import { buildCommitWebUrl, parseFileRevisions } from './utils'
 import type { FileRevision } from './utils'
 import { logger, parseGitStatus } from '@/utils'
@@ -23,6 +25,7 @@ export * from './utils'
 export * from './historyUtils'
 export * from './lineHistoryUtils'
 export * from './pathUtils'
+export * from './worktreeUtils'
 
 // Cache interface
 interface CacheEntry<T> {
@@ -851,6 +854,165 @@ export const useGitService = createSingletonComposable(() => {
     }
   }
 
+  // ----------------------------- Worktrees -----------------------------
+
+  /** 用 realpath 归一化路径，消除符号链接（如 macOS /var -> /private/var）、`.`/`..` 及 Windows 大小写差异；路径不存在时回退原值。 */
+  function canonicalizePath(input: string): string {
+    try {
+      return realpathSync(input)
+    }
+    catch {
+      return input
+    }
+  }
+
+  /** 用 `git rev-parse --show-toplevel` 取当前 worktree 根，这样打开 linked worktree 子目录时也能正确映射，避免删除保护失效。 */
+  async function getCurrentWorktreeRoot(): Promise<string> {
+    try {
+      const top = (await git.raw(['rev-parse', '--show-toplevel'])).trim()
+      return top || rootRepoPath
+    }
+    catch {
+      return rootRepoPath
+    }
+  }
+
+  /** 用 realpath 权威重算 `isCurrent`，防止符号链接或大小写差异绕过解析器的字符串比较；UI 与破坏性操作守卫均以此为准。 */
+  async function markCurrentWorktree(worktrees: GitWorktreeSummary['worktrees']): Promise<void> {
+    const currentCanonical = canonicalizePath(await getCurrentWorktreeRoot())
+    for (const worktree of worktrees)
+      worktree.isCurrent = canonicalizePath(worktree.path) === currentCanonical
+  }
+
+  /** 获取仓库的所有 worktree */
+  async function getWorktrees(): Promise<GitWorktreeSummary> {
+    // `-z`（NUL 分隔）是唯一能安全还原含空格或换行路径的格式。
+    const raw = await git.raw(['worktree', 'list', '--porcelain', '-z'])
+    const worktrees = parseWorktreeList(raw, rootRepoPath)
+    await markCurrentWorktree(worktrees)
+    return {
+      worktrees,
+      mainBranch: getMainWorktreeBranch(worktrees),
+    }
+  }
+
+  /** 从最新列表按路径查找 worktree，不信任调用方传入的对象；返回记录带权威的 isMain/isCurrent/bare 标志。 */
+  async function resolveWorktree(worktreePath: string): Promise<GitWorktree | undefined> {
+    const { worktrees } = await getWorktrees()
+    const targetCanonical = canonicalizePath(worktreePath)
+    return worktrees.find(worktree => canonicalizePath(worktree.path) === targetCanonical)
+      ?? worktrees.find(worktree => worktree.path === worktreePath)
+  }
+
+  /** 创建一个新的 worktree */
+  async function addWorktree(options: AddWorktreeOptions): Promise<void> {
+    const args = ['worktree', 'add']
+
+    if (options.force)
+      args.push('--force')
+
+    if (options.newBranch)
+      args.push('-b', options.newBranch)
+    else if (options.detach)
+      args.push('--detach')
+
+    args.push(options.path)
+
+    if (options.ref)
+      args.push(options.ref)
+
+    await git.raw(args)
+    clearCache()
+  }
+
+  /** 删除指定 worktree */
+  async function removeWorktree(worktreePath: string, force = false): Promise<void> {
+    // Webview believed.
+    const target = await resolveWorktree(worktreePath)
+    if (target?.isMain)
+      throw new Error('Cannot remove the main working tree')
+    if (target?.isCurrent)
+      throw new Error('Cannot remove the worktree that is currently open')
+
+    const args = ['worktree', 'remove']
+    if (force)
+      args.push('--force')
+    args.push(worktreePath)
+    await git.raw(args)
+    clearCache()
+  }
+
+  /** 锁定 worktree */
+  async function lockWorktree(worktreePath: string, reason?: string): Promise<void> {
+    // Git 拒绝锁定主 worktree，提前用清晰信息报错。
+    const target = await resolveWorktree(worktreePath)
+    if (target?.isMain)
+      throw new Error('Cannot lock the main working tree')
+
+    const args = ['worktree', 'lock']
+    if (reason)
+      args.push('--reason', reason)
+    args.push(worktreePath)
+    await git.raw(args)
+  }
+
+  /** 解锁 worktree */
+  async function unlockWorktree(worktreePath: string): Promise<void> {
+    const target = await resolveWorktree(worktreePath)
+    if (target?.isMain)
+      throw new Error('Cannot unlock the main working tree')
+    await git.raw(['worktree', 'unlock', worktreePath])
+  }
+
+  /** 清理已失效的 worktree 元数据 */
+  async function pruneWorktrees(): Promise<void> {
+    await git.raw(['worktree', 'prune'])
+  }
+
+  /**
+   * 将指定 worktree 当前检出的分支合并到主工作树。
+   * 为避免切换当前工作区，在主工作树目录上用独立的 simpleGit 实例执行。
+   *
+   * 接收 worktree 路径（而非分支名），服务端重新解析并使用权威分支，
+   * 避免过期/伪造的 Webview 消息把任意分支合并进主分支。
+   */
+  async function mergeWorktreeBranch(worktreePath: string): Promise<void> {
+    const { worktrees, mainBranch } = await getWorktrees()
+    const main = worktrees.find(worktree => worktree.isMain)
+    if (!main)
+      throw new Error('Unable to locate the main working tree')
+
+    if (main.bare)
+      throw new Error('The main repository is bare and has no working tree to merge into')
+
+    // 按路径重新解析源 worktree，使用它当前检出的分支，绝不用调用方传入的分支名。
+    const targetCanonical = canonicalizePath(worktreePath)
+    const source = worktrees.find(worktree => canonicalizePath(worktree.path) === targetCanonical)
+      ?? worktrees.find(worktree => worktree.path === worktreePath)
+    if (!source)
+      throw new Error('Unable to locate the selected worktree')
+    if (source.isMain)
+      throw new Error('Cannot merge the main working tree into itself')
+    if (source.detached || !source.branch)
+      throw new Error('This worktree has no branch to merge')
+
+    const branch = source.branch
+    if (mainBranch && branch === mainBranch)
+      throw new Error('Cannot merge the main branch into itself')
+
+    const mainGit = simpleGit(main.path, {
+      binary: 'git',
+      maxConcurrentProcesses: 10,
+    })
+
+    const status = await mainGit.status()
+    if (!status.isClean())
+      throw new Error('The main working tree has uncommitted changes. Commit or stash them before merging.')
+
+    await mainGit.raw(['merge', branch])
+    clearCache()
+  }
+
   return {
     git,
     rootRepoPath,
@@ -882,5 +1044,12 @@ export const useGitService = createSingletonComposable(() => {
     getStashStat,
     getStashFiles,
     resolveStashHash,
+    getWorktrees,
+    addWorktree,
+    removeWorktree,
+    lockWorktree,
+    unlockWorktree,
+    pruneWorktrees,
+    mergeWorktreeBranch,
   }
 })
