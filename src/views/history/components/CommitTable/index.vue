@@ -359,9 +359,25 @@ function getSelectionAnchorIndex(fallbackIndex: number) {
   return anchorIndex === -1 ? fallbackIndex : anchorIndex
 }
 
-function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
-  isDragging.value = true
+let suppressNextSelectHash: string | null = null
 
+function suppressNextClickSelect(hash: string) {
+  suppressNextSelectHash = hash
+}
+
+function postSelectedCommitDetails() {
+  try {
+    window.vscode.postMessage({
+      command: WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS,
+      commitHashes: JSON.stringify(toRaw(selectedCommitHashes.value)),
+    })
+  }
+  catch (error) {
+    console.error('Error sending commit details:', error)
+  }
+}
+
+function updateSelection(hash: string, index: number, event: MouseEvent) {
   if (event.shiftKey) {
     const anchorIndex = getSelectionAnchorIndex(index)
     selectionAnchorHash.value = commitData.value[anchorIndex]?.hash ?? hash
@@ -382,8 +398,23 @@ function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
     selectedCommitHashes.value = [hash]
     selectionAnchorHash.value = hash
   }
+}
 
-  handleMouseUp()
+function handleCommitSelected(hash: string, index: number, event: MouseEvent) {
+  const isModifiedClick = event.ctrlKey || event.metaKey || event.shiftKey
+
+  if (suppressNextSelectHash === hash) {
+    if (isModifiedClick)
+      event.preventDefault()
+    suppressNextSelectHash = null
+    return
+  }
+
+  if (isModifiedClick)
+    event.preventDefault()
+
+  updateSelection(hash, index, event)
+  postSelectedCommitDetails()
 }
 
 function handleMouseDown(index: number, event: MouseEvent) {
@@ -396,13 +427,20 @@ function handleMouseDown(index: number, event: MouseEvent) {
   if (!commit)
     return
 
-  if (!event.ctrlKey && !event.metaKey && !event.shiftKey) {
-    isDragging.value = true
-    selectionStart.value = index
-    selectionAnchorHash.value = commit.hash
-    dragEndIndex.value = index
-    selectedCommitHashes.value = [commit.hash]
+  suppressNextClickSelect(commit.hash)
+
+  if (event.ctrlKey || event.metaKey || event.shiftKey) {
+    event.preventDefault()
+    updateSelection(commit.hash, index, event)
+    postSelectedCommitDetails()
+    return
   }
+
+  isDragging.value = true
+  selectionStart.value = index
+  selectionAnchorHash.value = commit.hash
+  dragEndIndex.value = index
+  selectedCommitHashes.value = [commit.hash]
 }
 
 function handleMouseOver(index: number) {
@@ -418,15 +456,7 @@ function handleMouseUp() {
   isDragging.value = false
 
   if (wasDragging) {
-    try {
-      window.vscode.postMessage({
-        command: WEBVIEW_CHANNEL.SHOW_COMMIT_DETAILS,
-        commitHashes: JSON.stringify(toRaw(selectedCommitHashes.value)),
-      })
-    }
-    catch (error) {
-      console.error('Error sending commit details:', error)
-    }
+    postSelectedCommitDetails()
   }
 
   // 最后重置选择起点
