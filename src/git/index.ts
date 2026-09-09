@@ -16,7 +16,7 @@ import { parseGitBlameLine, parseGitDiffPreviousLine } from './lineHistoryUtils'
 import { getMainWorktreeBranch, parseWorktreeList } from './worktreeUtils'
 import { buildCommitWebUrl, parseFileRevisions } from './utils'
 import type { FileRevision } from './utils'
-import { logger, parseGitStatus } from '@/utils'
+import { formatError, logger, parseGitStatus } from '@/utils'
 import { config } from '@/config'
 import { GIT_STATUS } from '@/constant'
 
@@ -62,10 +62,13 @@ export const useGitService = createSingletonComposable(() => {
 
   const rootRepoPath = workspaceFolders.value[0].uri.fsPath
 
-  const git: SimpleGit = simpleGit(rootRepoPath, {
+  // 共享的 simpleGit 配置，merge 等需要独立实例的场景复用，保证 binary 等行为一致。
+  const gitOptions = {
     binary: 'git',
     maxConcurrentProcesses: 10,
-  })
+  }
+
+  const git: SimpleGit = simpleGit(rootRepoPath, gitOptions)
 
   // Initialize cache storage
   const historyCache = new Map<string, CacheEntry<CommitGraph>>()
@@ -886,8 +889,21 @@ export const useGitService = createSingletonComposable(() => {
 
   /** 获取仓库的所有 worktree */
   async function getWorktrees(): Promise<GitWorktreeSummary> {
-    // `-z`（NUL 分隔）是唯一能安全还原含空格或换行路径的格式。
-    const raw = await git.raw(['worktree', 'list', '--porcelain', '-z'])
+    // `-z`（NUL 分隔）是唯一能安全还原含空格或换行路径的格式，但需要 Git 2.36+。
+    // 更老的 Git 会报 unknown option，此时降级为不带 -z 的换行格式（splitRecords 已兼容）。
+    let raw: string
+    try {
+      raw = await git.raw(['worktree', 'list', '--porcelain', '-z'])
+    }
+    catch (error) {
+      if (/unknown option|usage: git worktree/i.test(formatError(error))) {
+        logger.warn('`git worktree list -z` unsupported (Git < 2.36); falling back to newline format')
+        raw = await git.raw(['worktree', 'list', '--porcelain'])
+      }
+      else {
+        throw error
+      }
+    }
     const worktrees = parseWorktreeList(raw, rootRepoPath)
     await markCurrentWorktree(worktrees)
     return {
@@ -1000,10 +1016,7 @@ export const useGitService = createSingletonComposable(() => {
     if (mainBranch && branch === mainBranch)
       throw new Error('Cannot merge the main branch into itself')
 
-    const mainGit = simpleGit(main.path, {
-      binary: 'git',
-      maxConcurrentProcesses: 10,
-    })
+    const mainGit = simpleGit(main.path, gitOptions)
 
     const status = await mainGit.status()
     if (!status.isClean())

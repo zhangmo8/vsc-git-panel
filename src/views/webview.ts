@@ -853,7 +853,8 @@ export const useGitPanelView = createSingletonComposable(() => {
     catch (error) {
       const errorMessage = formatError(error)
       logger.error(`Failed to ${action} worktree:`, error)
-      const looksLikeConflict = /conflict|merge/i.test(errorMessage)
+      // 仅在真正的合并冲突时提示去源码管理解决，避免权限/分支不存在等无关错误误报。
+      const looksLikeConflict = /^(?:CONFLICT|Automatic merge failed)/im.test(errorMessage)
       const hint = looksLikeConflict
         ? ' Resolve conflicts in the main working tree via Source Control.'
         : ''
@@ -917,13 +918,22 @@ export const useGitPanelView = createSingletonComposable(() => {
         ref = base.trim() || undefined
       }
       else if (picked.isRemote) {
-        // 直接检出 remote 分支会变成 detached HEAD，改为建立本地跟踪分支（去掉 remote 前缀）。
+        // 直接检出 remote 分支会变成 detached HEAD。去掉 remote 前缀得到本地分支名：
+        // 若本地已有同名分支则直接 checkout（-b 会因 already exists 失败），否则创建跟踪分支。
         const prefix = picked.remote ? `${picked.remote}/` : ''
         const localName = prefix && picked.value.startsWith(prefix)
           ? picked.value.slice(prefix.length)
           : picked.value
-        newBranch = localName
-        ref = picked.value
+        const localExists = refs.branches.some(
+          branch => branch.type === 'local' && branch.name === localName,
+        )
+        if (localExists) {
+          ref = localName
+        }
+        else {
+          newBranch = localName
+          ref = picked.value
+        }
       }
       else {
         ref = picked.value
