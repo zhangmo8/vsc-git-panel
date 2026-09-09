@@ -94,6 +94,64 @@ export interface GitLineHistory {
 export type GitRefType = 'local' | 'remote'
 export type GitBranchAction = 'switch' | 'pull' | 'delete' | 'rename' | 'clone' | 'push'
 
+export type GitWorktreeAction =
+  | 'open'
+  | 'openNewWindow'
+  | 'reveal'
+  | 'copyPath'
+  | 'lock'
+  | 'unlock'
+  | 'remove'
+  | 'merge'
+
+export interface GitWorktree {
+  /** worktree 绝对路径 */
+  path: string
+  /** 该 worktree 检出的分支短名（detached 时为空） */
+  branch?: string
+  /** 完整 ref，如 refs/heads/main */
+  fullBranch?: string
+  /** HEAD commit 完整 hash */
+  head?: string
+  /** HEAD commit 简短 hash */
+  shortHead?: string
+  /** 是否为主工作树 */
+  isMain: boolean
+  /** 是否为扩展当前打开的工作区 */
+  isCurrent: boolean
+  /** 是否 detached HEAD */
+  detached: boolean
+  /** 是否被锁定 */
+  locked: boolean
+  /** 锁定原因（若有） */
+  lockReason?: string
+  /** git 认为该目录已缺失、可被 prune */
+  prunable: boolean
+  /** prune 原因（若有） */
+  prunableReason?: string
+  /** 是否 bare */
+  bare: boolean
+}
+
+export interface GitWorktreeSummary {
+  worktrees: GitWorktree[]
+  /** 主项目分支名，供 merge 目标展示 */
+  mainBranch?: string
+}
+
+export interface AddWorktreeOptions {
+  /** 目标目录（绝对或相对仓库根） */
+  path: string
+  /** 基于的 ref（分支/commit/tag） */
+  ref?: string
+  /** 若提供则以 -b 创建新分支 */
+  newBranch?: string
+  /** 以 detached HEAD 检出 */
+  detach?: boolean
+  /** 强制（覆盖已存在分支等） */
+  force?: boolean
+}
+
 export interface GitBranchRef {
   /** Short ref name, such as `main` or `origin/main` */
   name: string

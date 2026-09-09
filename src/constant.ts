@@ -17,6 +17,9 @@ export const WEBVIEW_CHANNEL = {
   CLEAR_STASH: 'clear-stash',
   SHOW_STASH_DIFF: 'show-stash-diff',
   SHOW_STASH_DETAILS: 'show-stash-details',
+  GET_WORKTREES: 'get-worktrees',
+  RUN_WORKTREE_ACTION: 'run-worktree-action',
+  ADD_WORKTREE: 'add-worktree',
 } as const
 
 // vscode to webview channel
@@ -31,6 +34,7 @@ export const CHANNEL = {
   STASH_LIST: 'stash-list',
   STASH_ACTION_RESULT: 'stash-action-result',
   GIT_REFS: 'git-refs',
+  WORKTREES: 'worktrees',
 } as const
 
 export const EXTENSION_SYMBOL = 'git-panel'
